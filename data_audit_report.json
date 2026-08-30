@@ -1,0 +1,60 @@
+{
+  "dataset_sizes": {
+    "vehicles": 100,
+    "routes": 329,
+    "hubs": 15,
+    "current_shipments": 100,
+    "historical_shipments": 12000,
+    "temperature_history": 100000,
+    "delay_history": 12000,
+    "cost_data": 8000,
+    "handling_history": 10000,
+    "vehicle_availability": 15050
+  },
+  "join_coverage_after_id_normalization": {
+    "delay_vehicle_to_vehicle_master": 0.0,
+    "delay_route_to_route_master": 1.0,
+    "delay_shipment_to_historical_shipments": 1.0,
+    "cost_vehicle_to_vehicle_master": 0.0,
+    "cost_route_to_route_master": 1.0,
+    "handling_vehicle_to_vehicle_master": 0.0,
+    "handling_route_to_route_master": 1.0,
+    "handling_shipment_to_historical_shipments": 1.0,
+    "temperature_shipment_to_historical_shipments": 1.0,
+    "availability_vehicle_to_vehicle_master": 1.0
+  },
+  "hub_mapping": {
+    "mapped_rows": 7529,
+    "unmapped_rows": 2471,
+    "unmapped_hub_ids": [
+      "HUB16",
+      "HUB17",
+      "HUB18",
+      "HUB19",
+      "HUB20"
+    ]
+  },
+  "target_counts": {
+    "delayed": {
+      "0": 6558,
+      "1": 5442
+    },
+    "spoiled": {
+      "0": 11483,
+      "1": 517
+    }
+  },
+  "label_conflicts_to_review": {
+    "delayed_1_but_delay_minutes_0": 131,
+    "delayed_0_but_delay_minutes_gt0": 6044,
+    "on_time_1_but_delay_hours_gt0": 107,
+    "on_time_0_but_delay_hours_le0": 0
+  },
+  "temperature_consistency": {
+    "in_range_1_but_temperature_outside_bounds": 0,
+    "in_range_0_but_temperature_inside_bounds": 0
+  },
+  "cost_reconciliation": {
+    "max_abs_error": 0.020000000001346052
+  }
+}

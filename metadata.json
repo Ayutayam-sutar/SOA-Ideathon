@@ -1,0 +1,6 @@
+{
+  "name": "Karwaan - Agri-Logistics Consolidation Platform",
+  "description": "Agri-logistics consolidation platform for grouping small perishable goods shipments into optimized multimodal routes with live spoilage risk tracking and incident re-routing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

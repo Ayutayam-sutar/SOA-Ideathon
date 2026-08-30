@@ -1,0 +1,1480 @@
+[
+    {
+        "Filename": "cost_data_clean.csv",
+        "Total Rows": 8000,
+        "Total Columns": 17,
+        "Duplicate Rows": 0,
+        "Columns": {
+            "cost_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 8000,
+                "Type": "Categorical"
+            },
+            "route_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 100,
+                "Type": "Categorical"
+            },
+            "vehicle_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 50,
+                "Type": "Categorical"
+            },
+            "transport_mode": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 3,
+                "Type": "Categorical"
+            },
+            "distance_km": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 4062,
+                "Type": "Numerical"
+            },
+            "base_cost": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 5684,
+                "Type": "Numerical"
+            },
+            "fuel_cost": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 7747,
+                "Type": "Numerical"
+            },
+            "driver_cost": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 7590,
+                "Type": "Numerical"
+            },
+            "toll_cost": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 7147,
+                "Type": "Numerical"
+            },
+            "handling_cost": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 7572,
+                "Type": "Numerical"
+            },
+            "transfer_cost": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 7549,
+                "Type": "Numerical"
+            },
+            "temperature_control_cost": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 3049,
+                "Type": "Numerical"
+            },
+            "total_cost": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 7954,
+                "Type": "Numerical"
+            },
+            "cost_per_kg": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 1080,
+                "Type": "Numerical"
+            },
+            "cost_per_km": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 2941,
+                "Type": "Numerical"
+            },
+            "fuel_price_index": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 351,
+                "Type": "Numerical"
+            },
+            "route_id_raw": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 100,
+                "Type": "Categorical"
+            }
+        }
+    },
+    {
+        "Filename": "current_shipments_clean.csv",
+        "Total Rows": 100,
+        "Total Columns": 13,
+        "Duplicate Rows": 0,
+        "Columns": {
+            "shipment_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 100,
+                "Type": "Categorical"
+            },
+            "shipper_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 54,
+                "Type": "Categorical"
+            },
+            "product_type": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 12,
+                "Type": "Categorical"
+            },
+            "weight_kg": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 97,
+                "Type": "Numerical"
+            },
+            "origin": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 11,
+                "Type": "Categorical"
+            },
+            "destination": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 9,
+                "Type": "Categorical"
+            },
+            "required_min_temp_c": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 6,
+                "Type": "Numerical"
+            },
+            "required_max_temp_c": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 7,
+                "Type": "Numerical"
+            },
+            "pickup_start_hour": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 18,
+                "Type": "Numerical"
+            },
+            "pickup_end_hour": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 20,
+                "Type": "Numerical"
+            },
+            "delivery_deadline_hr": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 33,
+                "Type": "Numerical"
+            },
+            "priority": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 4,
+                "Type": "Categorical"
+            },
+            "created_day": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 7,
+                "Type": "Numerical"
+            }
+        }
+    },
+    {
+        "Filename": "delay_history_clean.csv",
+        "Total Rows": 12000,
+        "Total Columns": 20,
+        "Duplicate Rows": 0,
+        "Columns": {
+            "delay_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 12000,
+                "Type": "Categorical"
+            },
+            "shipment_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 1500,
+                "Type": "Categorical"
+            },
+            "route_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 100,
+                "Type": "Categorical"
+            },
+            "vehicle_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 50,
+                "Type": "Categorical"
+            },
+            "transport_mode": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 3,
+                "Type": "Categorical"
+            },
+            "departure_timestamp": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 11911,
+                "Type": "Timestamp/Date"
+            },
+            "distance_km": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 4408,
+                "Type": "Numerical"
+            },
+            "planned_transit_hours": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 1691,
+                "Type": "Numerical"
+            },
+            "actual_transit_hours": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 1854,
+                "Type": "Numerical"
+            },
+            "delay_hours": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 729,
+                "Type": "Numerical"
+            },
+            "on_time": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 2,
+                "Type": "Timestamp/Date"
+            },
+            "historical_route_reliability": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 271,
+                "Type": "Numerical"
+            },
+            "congestion_level": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 3,
+                "Type": "Categorical"
+            },
+            "weather_condition": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 4,
+                "Type": "Categorical"
+            },
+            "transfer_count": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 4,
+                "Type": "Numerical"
+            },
+            "handling_time_hours": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 481,
+                "Type": "Timestamp/Date"
+            },
+            "day_of_week": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 7,
+                "Type": "Categorical"
+            },
+            "peak_period": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 2,
+                "Type": "Numerical"
+            },
+            "route_id_raw": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 100,
+                "Type": "Categorical"
+            },
+            "shipment_id_raw": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 1500,
+                "Type": "Categorical"
+            }
+        }
+    },
+    {
+        "Filename": "delay_training_ready.csv",
+        "Total Rows": 12000,
+        "Total Columns": 32,
+        "Duplicate Rows": 0,
+        "Columns": {
+            "shipment_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 12000,
+                "Type": "Categorical"
+            },
+            "product_type": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 12,
+                "Type": "Categorical"
+            },
+            "weight_kg": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 1385,
+                "Type": "Numerical"
+            },
+            "transport_mode": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 3,
+                "Type": "Categorical"
+            },
+            "base_transit_hr": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 239,
+                "Type": "Numerical"
+            },
+            "required_min_temp_c": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 6,
+                "Type": "Numerical"
+            },
+            "required_max_temp_c": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 7,
+                "Type": "Numerical"
+            },
+            "pickup_hour": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 24,
+                "Type": "Numerical"
+            },
+            "delivery_deadline_hr": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 471,
+                "Type": "Numerical"
+            },
+            "transfer_count": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 4,
+                "Type": "Numerical"
+            },
+            "rain_flag": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 2,
+                "Type": "Numerical"
+            },
+            "congestion_index": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 1001,
+                "Type": "Numerical"
+            },
+            "historical_route_reliability": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 251,
+                "Type": "Numerical"
+            },
+            "assigned_vehicle_id": {
+                "DataType": "object",
+                "Missing Values": 10500,
+                "Unique Values": 50,
+                "Type": "Categorical"
+            },
+            "assigned_route_id": {
+                "DataType": "object",
+                "Missing Values": 10500,
+                "Unique Values": 100,
+                "Type": "Categorical"
+            },
+            "assigned_vehicle_type": {
+                "DataType": "float64",
+                "Missing Values": 12000,
+                "Unique Values": 0,
+                "Type": "Numerical"
+            },
+            "vehicle_capacity_kg": {
+                "DataType": "float64",
+                "Missing Values": 12000,
+                "Unique Values": 0,
+                "Type": "Numerical"
+            },
+            "vehicle_temp_min_c": {
+                "DataType": "float64",
+                "Missing Values": 12000,
+                "Unique Values": 0,
+                "Type": "Numerical"
+            },
+            "vehicle_temp_max_c": {
+                "DataType": "float64",
+                "Missing Values": 12000,
+                "Unique Values": 0,
+                "Type": "Numerical"
+            },
+            "vehicle_reliability_feature": {
+                "DataType": "float64",
+                "Missing Values": 12000,
+                "Unique Values": 0,
+                "Type": "Numerical"
+            },
+            "vehicle_temperature_control_score": {
+                "DataType": "float64",
+                "Missing Values": 12000,
+                "Unique Values": 0,
+                "Type": "Numerical"
+            },
+            "route_avg_transit_hr": {
+                "DataType": "float64",
+                "Missing Values": 10500,
+                "Unique Values": 99,
+                "Type": "Numerical"
+            },
+            "route_reliability_feature": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 255,
+                "Type": "Numerical"
+            },
+            "route_temperature_stability": {
+                "DataType": "float64",
+                "Missing Values": 10500,
+                "Unique Values": 24,
+                "Type": "Numerical"
+            },
+            "route_weather_sensitivity": {
+                "DataType": "float64",
+                "Missing Values": 10500,
+                "Unique Values": 56,
+                "Type": "Numerical"
+            },
+            "route_base_cost_inr": {
+                "DataType": "float64",
+                "Missing Values": 10500,
+                "Unique Values": 100,
+                "Type": "Numerical"
+            },
+            "route_typical_transfer_count": {
+                "DataType": "float64",
+                "Missing Values": 10500,
+                "Unique Values": 4,
+                "Type": "Numerical"
+            },
+            "historical_handling_time_hours": {
+                "DataType": "float64",
+                "Missing Values": 10500,
+                "Unique Values": 375,
+                "Type": "Timestamp/Date"
+            },
+            "historical_congestion_level": {
+                "DataType": "object",
+                "Missing Values": 10500,
+                "Unique Values": 3,
+                "Type": "Categorical"
+            },
+            "historical_weather_condition": {
+                "DataType": "object",
+                "Missing Values": 10500,
+                "Unique Values": 4,
+                "Type": "Categorical"
+            },
+            "historical_peak_period": {
+                "DataType": "float64",
+                "Missing Values": 10500,
+                "Unique Values": 2,
+                "Type": "Numerical"
+            },
+            "delayed": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 2,
+                "Type": "Numerical"
+            }
+        }
+    },
+    {
+        "Filename": "historical_shipments_clean.csv",
+        "Total Rows": 12000,
+        "Total Columns": 22,
+        "Duplicate Rows": 0,
+        "Columns": {
+            "shipment_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 12000,
+                "Type": "Categorical"
+            },
+            "product_type": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 12,
+                "Type": "Categorical"
+            },
+            "weight_kg": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 1385,
+                "Type": "Numerical"
+            },
+            "origin": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 11,
+                "Type": "Categorical"
+            },
+            "destination": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 9,
+                "Type": "Categorical"
+            },
+            "transport_mode": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 3,
+                "Type": "Categorical"
+            },
+            "distance_km": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 84,
+                "Type": "Numerical"
+            },
+            "base_transit_hr": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 239,
+                "Type": "Numerical"
+            },
+            "required_min_temp_c": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 6,
+                "Type": "Numerical"
+            },
+            "required_max_temp_c": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 7,
+                "Type": "Numerical"
+            },
+            "pickup_hour": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 24,
+                "Type": "Numerical"
+            },
+            "delivery_deadline_hr": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 471,
+                "Type": "Numerical"
+            },
+            "transfer_count": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 4,
+                "Type": "Numerical"
+            },
+            "rain_flag": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 2,
+                "Type": "Numerical"
+            },
+            "congestion_index": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 1001,
+                "Type": "Numerical"
+            },
+            "historical_route_reliability": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 251,
+                "Type": "Numerical"
+            },
+            "temperature_excursion_minutes": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 704,
+                "Type": "Numerical"
+            },
+            "estimated_cost_inr": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 11663,
+                "Type": "Numerical"
+            },
+            "delayed": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 2,
+                "Type": "Numerical"
+            },
+            "delay_minutes": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 1425,
+                "Type": "Numerical"
+            },
+            "spoiled": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 2,
+                "Type": "Numerical"
+            },
+            "shipment_id_raw": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 12000,
+                "Type": "Categorical"
+            }
+        }
+    },
+    {
+        "Filename": "historical_transfer_handling_clean.csv",
+        "Total Rows": 10000,
+        "Total Columns": 24,
+        "Duplicate Rows": 0,
+        "Columns": {
+            "handling_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 10000,
+                "Type": "Categorical"
+            },
+            "shipment_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 1498,
+                "Type": "Categorical"
+            },
+            "route_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 100,
+                "Type": "Categorical"
+            },
+            "hub_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 20,
+                "Type": "Categorical"
+            },
+            "vehicle_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 50,
+                "Type": "Categorical"
+            },
+            "transfer_type": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 4,
+                "Type": "Categorical"
+            },
+            "product_category": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 7,
+                "Type": "Categorical"
+            },
+            "cargo_weight_kg": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 7846,
+                "Type": "Numerical"
+            },
+            "arrival_timestamp": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 9951,
+                "Type": "Timestamp/Date"
+            },
+            "departure_timestamp": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 9991,
+                "Type": "Timestamp/Date"
+            },
+            "handling_time_hours": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 231,
+                "Type": "Timestamp/Date"
+            },
+            "loading_time_hours": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 106,
+                "Type": "Timestamp/Date"
+            },
+            "unloading_time_hours": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 116,
+                "Type": "Timestamp/Date"
+            },
+            "queue_time_hours": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 1041,
+                "Type": "Timestamp/Date"
+            },
+            "temperature_during_handling_c": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 2522,
+                "Type": "Numerical"
+            },
+            "temperature_excursion": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 2,
+                "Type": "Numerical"
+            },
+            "damage_incident": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 2,
+                "Type": "Numerical"
+            },
+            "handling_cost": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 9191,
+                "Type": "Numerical"
+            },
+            "transfer_delay_hours": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 613,
+                "Type": "Numerical"
+            },
+            "route_id_raw": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 100,
+                "Type": "Categorical"
+            },
+            "shipment_id_raw": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 1498,
+                "Type": "Categorical"
+            },
+            "hub_id_raw": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 20,
+                "Type": "Categorical"
+            },
+            "hub_number": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 20,
+                "Type": "Numerical"
+            },
+            "hub_id_mapped": {
+                "DataType": "object",
+                "Missing Values": 2471,
+                "Unique Values": 15,
+                "Type": "Categorical"
+            }
+        }
+    },
+    {
+        "Filename": "hubs_clean.csv",
+        "Total Rows": 15,
+        "Total Columns": 12,
+        "Duplicate Rows": 0,
+        "Columns": {
+            "hub_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 15,
+                "Type": "Categorical"
+            },
+            "hub_name": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 15,
+                "Type": "Categorical"
+            },
+            "city": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 15,
+                "Type": "Categorical"
+            },
+            "road_access": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 1,
+                "Type": "Numerical"
+            },
+            "rail_access": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 2,
+                "Type": "Numerical"
+            },
+            "cold_storage": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 1,
+                "Type": "Numerical"
+            },
+            "reefer_cross_dock": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 2,
+                "Type": "Numerical"
+            },
+            "capacity_kg": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 10,
+                "Type": "Numerical"
+            },
+            "latitude": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 15,
+                "Type": "Numerical"
+            },
+            "longitude": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 15,
+                "Type": "Numerical"
+            },
+            "handling_cost_per_kg": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 15,
+                "Type": "Numerical"
+            },
+            "cold_storage_cost_per_kg_hr": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 12,
+                "Type": "Numerical"
+            }
+        }
+    },
+    {
+        "Filename": "routes_clean.csv",
+        "Total Rows": 329,
+        "Total Columns": 12,
+        "Duplicate Rows": 0,
+        "Columns": {
+            "route_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 329,
+                "Type": "Categorical"
+            },
+            "origin": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 15,
+                "Type": "Categorical"
+            },
+            "destination": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 15,
+                "Type": "Categorical"
+            },
+            "mode": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 3,
+                "Type": "Categorical"
+            },
+            "distance_km": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 98,
+                "Type": "Numerical"
+            },
+            "avg_transit_hr": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 281,
+                "Type": "Numerical"
+            },
+            "reliability": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 155,
+                "Type": "Numerical"
+            },
+            "base_cost_inr": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 329,
+                "Type": "Numerical"
+            },
+            "typical_transfer_count": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 4,
+                "Type": "Numerical"
+            },
+            "weather_sensitivity": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 97,
+                "Type": "Numerical"
+            },
+            "temperature_stability_score": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 27,
+                "Type": "Numerical"
+            },
+            "route_id_raw": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 329,
+                "Type": "Categorical"
+            }
+        }
+    },
+    {
+        "Filename": "spoilage_training_ready.csv",
+        "Total Rows": 12000,
+        "Total Columns": 32,
+        "Duplicate Rows": 0,
+        "Columns": {
+            "shipment_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 12000,
+                "Type": "Categorical"
+            },
+            "product_type": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 12,
+                "Type": "Categorical"
+            },
+            "weight_kg": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 1385,
+                "Type": "Numerical"
+            },
+            "transport_mode": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 3,
+                "Type": "Categorical"
+            },
+            "base_transit_hr": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 239,
+                "Type": "Numerical"
+            },
+            "required_min_temp_c": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 6,
+                "Type": "Numerical"
+            },
+            "required_max_temp_c": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 7,
+                "Type": "Numerical"
+            },
+            "pickup_hour": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 24,
+                "Type": "Numerical"
+            },
+            "delivery_deadline_hr": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 471,
+                "Type": "Numerical"
+            },
+            "transfer_count": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 4,
+                "Type": "Numerical"
+            },
+            "rain_flag": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 2,
+                "Type": "Numerical"
+            },
+            "congestion_index": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 1001,
+                "Type": "Numerical"
+            },
+            "historical_route_reliability": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 251,
+                "Type": "Numerical"
+            },
+            "assigned_vehicle_id": {
+                "DataType": "object",
+                "Missing Values": 10500,
+                "Unique Values": 50,
+                "Type": "Categorical"
+            },
+            "assigned_route_id": {
+                "DataType": "object",
+                "Missing Values": 10500,
+                "Unique Values": 100,
+                "Type": "Categorical"
+            },
+            "assigned_vehicle_type": {
+                "DataType": "float64",
+                "Missing Values": 12000,
+                "Unique Values": 0,
+                "Type": "Numerical"
+            },
+            "vehicle_capacity_kg": {
+                "DataType": "float64",
+                "Missing Values": 12000,
+                "Unique Values": 0,
+                "Type": "Numerical"
+            },
+            "vehicle_temp_min_c": {
+                "DataType": "float64",
+                "Missing Values": 12000,
+                "Unique Values": 0,
+                "Type": "Numerical"
+            },
+            "vehicle_temp_max_c": {
+                "DataType": "float64",
+                "Missing Values": 12000,
+                "Unique Values": 0,
+                "Type": "Numerical"
+            },
+            "vehicle_reliability_feature": {
+                "DataType": "float64",
+                "Missing Values": 12000,
+                "Unique Values": 0,
+                "Type": "Numerical"
+            },
+            "vehicle_temperature_control_score": {
+                "DataType": "float64",
+                "Missing Values": 12000,
+                "Unique Values": 0,
+                "Type": "Numerical"
+            },
+            "route_avg_transit_hr": {
+                "DataType": "float64",
+                "Missing Values": 10500,
+                "Unique Values": 99,
+                "Type": "Numerical"
+            },
+            "route_reliability_feature": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 255,
+                "Type": "Numerical"
+            },
+            "route_temperature_stability": {
+                "DataType": "float64",
+                "Missing Values": 10500,
+                "Unique Values": 24,
+                "Type": "Numerical"
+            },
+            "route_weather_sensitivity": {
+                "DataType": "float64",
+                "Missing Values": 10500,
+                "Unique Values": 56,
+                "Type": "Numerical"
+            },
+            "route_base_cost_inr": {
+                "DataType": "float64",
+                "Missing Values": 10500,
+                "Unique Values": 100,
+                "Type": "Numerical"
+            },
+            "route_typical_transfer_count": {
+                "DataType": "float64",
+                "Missing Values": 10500,
+                "Unique Values": 4,
+                "Type": "Numerical"
+            },
+            "historical_handling_time_hours": {
+                "DataType": "float64",
+                "Missing Values": 10500,
+                "Unique Values": 375,
+                "Type": "Timestamp/Date"
+            },
+            "historical_congestion_level": {
+                "DataType": "object",
+                "Missing Values": 10500,
+                "Unique Values": 3,
+                "Type": "Categorical"
+            },
+            "historical_weather_condition": {
+                "DataType": "object",
+                "Missing Values": 10500,
+                "Unique Values": 4,
+                "Type": "Categorical"
+            },
+            "historical_peak_period": {
+                "DataType": "float64",
+                "Missing Values": 10500,
+                "Unique Values": 2,
+                "Type": "Numerical"
+            },
+            "spoiled": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 2,
+                "Type": "Numerical"
+            }
+        }
+    },
+    {
+        "Filename": "temperature_history_clean.csv",
+        "Total Rows": 100000,
+        "Total Columns": 9,
+        "Duplicate Rows": 0,
+        "Columns": {
+            "record_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 100000,
+                "Type": "Categorical"
+            },
+            "shipment_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 11995,
+                "Type": "Categorical"
+            },
+            "hour_from_departure": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 25,
+                "Type": "Numerical"
+            },
+            "temperature_c": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 4336,
+                "Type": "Numerical"
+            },
+            "required_min_temp_c": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 6,
+                "Type": "Numerical"
+            },
+            "required_max_temp_c": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 7,
+                "Type": "Numerical"
+            },
+            "sensor_quality": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 2,
+                "Type": "Categorical"
+            },
+            "in_range": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 2,
+                "Type": "Numerical"
+            },
+            "shipment_id_raw": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 11995,
+                "Type": "Categorical"
+            }
+        }
+    },
+    {
+        "Filename": "temperature_shipment_aggregates_AUDIT_ONLY.csv",
+        "Total Rows": 11995,
+        "Total Columns": 9,
+        "Duplicate Rows": 0,
+        "Columns": {
+            "shipment_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 11995,
+                "Type": "Categorical"
+            },
+            "temp_obs_count": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 20,
+                "Type": "Numerical"
+            },
+            "observed_avg_temp": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 10518,
+                "Type": "Numerical"
+            },
+            "observed_min_temp": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 2257,
+                "Type": "Numerical"
+            },
+            "observed_max_temp": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 2722,
+                "Type": "Numerical"
+            },
+            "observed_temp_std": {
+                "DataType": "float64",
+                "Missing Values": 19,
+                "Unique Values": 11973,
+                "Type": "Numerical"
+            },
+            "observed_excursion_count": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 5,
+                "Type": "Numerical"
+            },
+            "observed_in_range_pct": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 39,
+                "Type": "Numerical"
+            },
+            "observed_sensor_fair_pct": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 80,
+                "Type": "Numerical"
+            }
+        }
+    },
+    {
+        "Filename": "vehicles_clean.csv",
+        "Total Rows": 100,
+        "Total Columns": 11,
+        "Duplicate Rows": 0,
+        "Columns": {
+            "vehicle_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 100,
+                "Type": "Categorical"
+            },
+            "vehicle_type": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 7,
+                "Type": "Categorical"
+            },
+            "capacity_kg": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 7,
+                "Type": "Numerical"
+            },
+            "min_temp_c": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 4,
+                "Type": "Numerical"
+            },
+            "max_temp_c": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 4,
+                "Type": "Numerical"
+            },
+            "current_location": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 15,
+                "Type": "Categorical"
+            },
+            "status": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 1,
+                "Type": "Categorical"
+            },
+            "cost_per_km_inr": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 87,
+                "Type": "Numerical"
+            },
+            "reliability": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 50,
+                "Type": "Numerical"
+            },
+            "temperature_control_score": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 72,
+                "Type": "Numerical"
+            },
+            "vehicle_id_raw": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 100,
+                "Type": "Categorical"
+            }
+        }
+    },
+    {
+        "Filename": "vehicle_availability_clean.csv",
+        "Total Rows": 15050,
+        "Total Columns": 16,
+        "Duplicate Rows": 0,
+        "Columns": {
+            "availability_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 15050,
+                "Type": "Categorical"
+            },
+            "vehicle_id": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 100,
+                "Type": "Categorical"
+            },
+            "date": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 601,
+                "Type": "Timestamp/Date"
+            },
+            "vehicle_type": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 9,
+                "Type": "Categorical"
+            },
+            "capacity_kg": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 9,
+                "Type": "Numerical"
+            },
+            "min_temp_c": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 7,
+                "Type": "Numerical"
+            },
+            "max_temp_c": {
+                "DataType": "int64",
+                "Missing Values": 0,
+                "Unique Values": 6,
+                "Type": "Numerical"
+            },
+            "home_location": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 16,
+                "Type": "Categorical"
+            },
+            "current_location": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 16,
+                "Type": "Categorical"
+            },
+            "availability_status": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 4,
+                "Type": "Categorical"
+            },
+            "available_from": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 7,
+                "Type": "Categorical"
+            },
+            "available_until": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 5,
+                "Type": "Categorical"
+            },
+            "estimated_cost_per_km": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 2604,
+                "Type": "Numerical"
+            },
+            "maintenance_status": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 3,
+                "Type": "Categorical"
+            },
+            "utilization_rate": {
+                "DataType": "float64",
+                "Missing Values": 0,
+                "Unique Values": 802,
+                "Type": "Numerical"
+            },
+            "vehicle_id_raw": {
+                "DataType": "object",
+                "Missing Values": 0,
+                "Unique Values": 100,
+                "Type": "Categorical"
+            }
+        }
+    }
+]

@@ -1,0 +1,101 @@
+shipment_id,shipper_id,product_type,weight_kg,origin,destination,required_min_temp_c,required_max_temp_c,pickup_start_hour,pickup_end_hour,delivery_deadline_hr,priority,created_day
+S001,MSME_A,Mango,300,Berhampur,Kolkata,8,12,6,9,24,High,2
+S002,MSME_B,Leafy Vegetables,250,Bhubaneswar,Kolkata,2,8,6,9,24,High,4
+S003,MSME_C,Mango,350,Gopalpur,Kolkata,8,12,6,9,24,High,3
+S004,MSME_D,Dairy,200,Cuttack,Kolkata,2,8,7,10,24,High,6
+S005,MSME_E,Rice,600,Bhubaneswar,Kolkata,15,30,8,12,36,Medium,3
+S006,MSME_F,Banana,450,Puri,Kolkata,12,15,6,10,24,Medium,3
+S007,MSME_G,Fish,350,Berhampur,Kolkata,-2,4,5,8,18,High,4
+S008,MSME_H,Pharmaceuticals,180,Bhubaneswar,Kolkata,2,8,8,11,18,Critical,6
+S009,MSME_10,Dairy,374,Jamshedpur,Visakhapatnam,2,8,10,13,34,Critical,2
+S010,MSME_17,Packaged Food,235,Cuttack,Ranchi,15,30,9,12,32,High,7
+S011,MSME_63,Tomato,698,Jamshedpur,Raipur,8,13,8,11,41,Medium,4
+S012,MSME_29,Frozen Food,324,Rourkela,Raipur,-20,-15,15,19,46,High,5
+S013,MSME_42,Spices,422,Visakhapatnam,Jamshedpur,15,30,3,8,30,Medium,7
+S014,MSME_14,Dairy,513,Cuttack,Chennai,2,8,2,7,46,Medium,4
+S015,MSME_15,Banana,708,Cuttack,Visakhapatnam,12,15,15,17,45,High,2
+S016,MSME_47,Banana,648,Berhampur,Kolkata,12,15,15,18,40,High,6
+S017,MSME_29,Spices,561,Sambalpur,Visakhapatnam,15,30,8,13,37,Critical,1
+S018,MSME_36,Mango,625,Rourkela,Bhubaneswar,8,12,7,11,39,Critical,4
+S019,MSME_42,Fish,246,Bhubaneswar,Kolkata,-2,4,12,15,29,High,7
+S020,MSME_44,Mango,411,Berhampur,Ranchi,8,12,15,20,33,High,3
+S021,MSME_57,Pharmaceuticals,606,Sambalpur,Bhubaneswar,2,8,5,10,35,Medium,5
+S022,MSME_26,Mango,163,Rourkela,Raipur,8,12,1,6,31,High,4
+S023,MSME_45,Frozen Food,154,Sambalpur,Cuttack,-20,-15,7,9,20,High,2
+S024,MSME_45,Spices,567,Ranchi,Jamshedpur,15,30,17,20,24,Medium,3
+S025,MSME_41,Spices,673,Ranchi,Kolkata,15,30,6,9,25,Low,4
+S026,MSME_32,Rice,238,Bhubaneswar,Ranchi,15,30,2,7,46,Medium,1
+S027,MSME_30,Packaged Food,166,Cuttack,Chennai,15,30,4,6,42,Medium,3
+S028,MSME_16,Spices,739,Jamshedpur,Visakhapatnam,15,30,10,15,34,Critical,3
+S029,MSME_65,Tomato,121,Gopalpur,Bhubaneswar,8,13,17,22,44,Medium,6
+S030,MSME_59,Packaged Food,253,Rourkela,Hyderabad,15,30,13,17,30,Low,1
+S031,MSME_59,Pharmaceuticals,860,Sambalpur,Raipur,2,8,8,12,22,Low,6
+S032,MSME_41,Pharmaceuticals,849,Visakhapatnam,Hyderabad,2,8,1,6,35,Medium,3
+S033,MSME_15,Flowers,178,Gopalpur,Visakhapatnam,2,8,4,8,20,High,5
+S034,MSME_42,Dairy,266,Bhubaneswar,Kolkata,2,8,16,21,19,Medium,4
+S035,MSME_47,Dairy,382,Rourkela,Visakhapatnam,2,8,13,16,45,Medium,3
+S036,MSME_59,Packaged Food,820,Visakhapatnam,Kolkata,15,30,17,20,35,High,7
+S037,MSME_10,Pharmaceuticals,646,Sambalpur,Ranchi,2,8,9,11,47,High,2
+S038,MSME_10,Tomato,389,Jamshedpur,Bhubaneswar,8,13,5,10,30,Medium,1
+S039,MSME_24,Mango,358,Gopalpur,Ranchi,8,12,14,16,31,Medium,6
+S040,MSME_29,Mango,221,Visakhapatnam,Jamshedpur,8,12,11,16,22,Medium,5
+S041,MSME_67,Tomato,608,Balasore,Kolkata,8,13,13,16,22,High,7
+S042,MSME_37,Packaged Food,295,Berhampur,Cuttack,15,30,4,9,13,High,4
+S043,MSME_40,Pharmaceuticals,693,Sambalpur,Bhubaneswar,2,8,4,8,34,Medium,1
+S044,MSME_49,Fish,162,Berhampur,Raipur,-2,4,8,10,48,Low,1
+S045,MSME_59,Pharmaceuticals,696,Rourkela,Hyderabad,2,8,8,11,32,High,4
+S046,MSME_17,Leafy Vegetables,785,Sambalpur,Visakhapatnam,2,8,16,18,46,Low,2
+S047,MSME_21,Leafy Vegetables,143,Ranchi,Cuttack,2,8,12,15,12,Medium,7
+S048,MSME_37,Spices,216,Puri,Bhubaneswar,15,30,3,5,26,High,1
+S049,MSME_17,Pharmaceuticals,615,Ranchi,Visakhapatnam,2,8,15,20,22,Critical,7
+S050,MSME_66,Fish,414,Berhampur,Jamshedpur,-2,4,16,20,47,Medium,2
+S051,MSME_55,Spices,454,Sambalpur,Ranchi,15,30,12,15,13,Medium,1
+S052,MSME_49,Fish,270,Rourkela,Visakhapatnam,-2,4,14,16,24,High,2
+S053,MSME_56,Packaged Food,484,Ranchi,Hyderabad,15,30,5,7,22,Medium,2
+S054,MSME_59,Leafy Vegetables,786,Cuttack,Ranchi,2,8,10,15,45,High,3
+S055,MSME_65,Spices,267,Visakhapatnam,Cuttack,15,30,10,15,33,Medium,3
+S056,MSME_27,Flowers,361,Rourkela,Jamshedpur,2,8,1,5,20,Low,4
+S057,MSME_47,Pharmaceuticals,808,Balasore,Visakhapatnam,2,8,9,13,31,Medium,4
+S058,MSME_59,Tomato,251,Balasore,Hyderabad,8,13,4,7,19,High,1
+S059,MSME_61,Rice,551,Jamshedpur,Chennai,15,30,5,8,22,High,1
+S060,MSME_49,Dairy,735,Jamshedpur,Chennai,2,8,0,2,43,Critical,2
+S061,MSME_54,Tomato,748,Gopalpur,Cuttack,8,13,7,9,28,Critical,2
+S062,MSME_16,Tomato,544,Gopalpur,Jamshedpur,8,13,9,14,20,High,1
+S063,MSME_24,Flowers,403,Gopalpur,Chennai,2,8,10,12,30,High,3
+S064,MSME_44,Dairy,137,Ranchi,Hyderabad,2,8,13,16,29,High,4
+S065,MSME_38,Frozen Food,407,Gopalpur,Cuttack,-20,-15,8,11,33,Medium,3
+S066,MSME_54,Banana,751,Balasore,Visakhapatnam,12,15,12,14,24,High,3
+S067,MSME_44,Frozen Food,206,Ranchi,Cuttack,-20,-15,1,5,22,High,4
+S068,MSME_25,Dairy,631,Cuttack,Raipur,2,8,3,6,30,Critical,4
+S069,MSME_69,Dairy,798,Gopalpur,Kolkata,2,8,4,7,44,Medium,3
+S070,MSME_33,Rice,106,Ranchi,Hyderabad,15,30,16,21,44,High,2
+S071,MSME_58,Flowers,398,Balasore,Kolkata,2,8,13,17,38,Medium,3
+S072,MSME_20,Frozen Food,268,Ranchi,Cuttack,-20,-15,6,10,35,Critical,1
+S073,MSME_18,Mango,284,Cuttack,Jamshedpur,8,12,14,16,43,Medium,4
+S074,MSME_10,Leafy Vegetables,893,Balasore,Ranchi,2,8,7,10,32,Medium,7
+S075,MSME_34,Packaged Food,371,Jamshedpur,Cuttack,15,30,12,15,18,High,3
+S076,MSME_33,Spices,192,Jamshedpur,Cuttack,15,30,2,6,45,Low,1
+S077,MSME_30,Flowers,535,Puri,Bhubaneswar,2,8,0,4,22,Medium,5
+S078,MSME_52,Rice,514,Bhubaneswar,Kolkata,15,30,4,6,33,Low,1
+S079,MSME_55,Leafy Vegetables,223,Ranchi,Hyderabad,2,8,3,8,25,High,2
+S080,MSME_39,Tomato,233,Cuttack,Visakhapatnam,8,13,13,18,13,Medium,2
+S081,MSME_14,Mango,767,Sambalpur,Ranchi,8,12,1,5,44,High,7
+S082,MSME_50,Spices,653,Ranchi,Hyderabad,15,30,9,13,31,High,7
+S083,MSME_28,Rice,162,Visakhapatnam,Ranchi,15,30,10,12,14,Critical,4
+S084,MSME_60,Frozen Food,634,Gopalpur,Kolkata,-20,-15,0,5,48,Medium,5
+S085,MSME_12,Leafy Vegetables,808,Jamshedpur,Bhubaneswar,2,8,2,4,39,Medium,5
+S086,MSME_25,Pharmaceuticals,502,Sambalpur,Ranchi,2,8,1,5,17,Medium,5
+S087,MSME_31,Rice,603,Bhubaneswar,Kolkata,15,30,3,6,20,High,4
+S088,MSME_66,Tomato,522,Sambalpur,Raipur,8,13,10,13,26,High,7
+S089,MSME_69,Flowers,687,Berhampur,Ranchi,2,8,4,9,43,High,6
+S090,MSME_50,Frozen Food,370,Rourkela,Visakhapatnam,-20,-15,9,14,40,Critical,1
+S091,MSME_45,Mango,130,Balasore,Hyderabad,8,12,8,12,16,Medium,3
+S092,MSME_21,Pharmaceuticals,680,Puri,Hyderabad,2,8,14,19,18,Low,7
+S093,MSME_12,Tomato,649,Ranchi,Bhubaneswar,8,13,7,10,13,High,3
+S094,MSME_36,Frozen Food,569,Puri,Raipur,-20,-15,4,6,46,Medium,2
+S095,MSME_67,Flowers,124,Sambalpur,Hyderabad,2,8,15,20,48,High,7
+S096,MSME_58,Mango,260,Balasore,Cuttack,8,12,14,18,39,Medium,5
+S097,MSME_59,Spices,459,Gopalpur,Ranchi,15,30,3,8,37,High,4
+S098,MSME_32,Packaged Food,302,Sambalpur,Ranchi,15,30,9,13,13,High,3
+S099,MSME_24,Dairy,439,Gopalpur,Ranchi,2,8,13,18,19,High,1
+S100,MSME_56,Spices,132,Cuttack,Hyderabad,15,30,1,5,25,Medium,3

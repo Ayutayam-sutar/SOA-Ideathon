@@ -1,0 +1,23 @@
+{
+  "name": "karwaan-workspace",
+  "private": true,
+  "scripts": {
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "install:frontend": "npm install --prefix frontend",
+    "install:backend": "npm install --prefix backend",
+    "install-all": "npm install --prefix frontend && npm install --prefix backend"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "lucide-react": "^1.32.0",
+    "motion": "^13.1.0",
+    "react-router-dom": "^7.18.2"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.22",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "tsx": "^4.23.13"
+  }
+}

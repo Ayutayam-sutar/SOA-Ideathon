@@ -1,0 +1,16 @@
+hub_id,hub_name,city,road_access,rail_access,cold_storage,reefer_cross_dock,capacity_kg,latitude,longitude,handling_cost_per_kg,cold_storage_cost_per_kg_hr
+H001,Bhubaneswar Central Cold Hub,Bhubaneswar,1,1,1,1,7000,20.2961,85.8245,2.35,0.12
+H002,Cuttack Agro Hub,Cuttack,1,0,1,1,5000,20.4625,85.883,1.68,0.17
+H003,Berhampur Collection Hub,Berhampur,1,0,1,0,4500,19.315,84.7941,2.52,0.09
+H004,Puri Agri Hub,Puri,1,0,1,0,3500,19.8135,85.8312,2.19,0.22
+H005,Gopalpur Port Logistics Hub,Gopalpur,1,1,1,0,4000,19.2586,84.9145,0.99,0.19
+H006,Balasore Cold Hub,Balasore,1,1,1,1,5000,21.4942,86.9317,2.75,0.21
+H007,Kharagpur Multimodal Hub,Kharagpur,1,1,1,1,6500,22.346,87.232,2.32,0.14
+H008,Kolkata Distribution Hub,Kolkata,1,1,1,1,10000,22.5726,88.3639,2.37,0.25
+H009,Jamshedpur Multimodal Hub,Jamshedpur,1,1,1,1,6000,22.8046,86.2029,1.06,0.23
+H010,Rourkela Logistics Hub,Rourkela,1,1,1,0,4500,22.2604,84.8536,1.7,0.21
+H011,Sambalpur Agri Hub,Sambalpur,1,1,1,0,4500,21.4669,83.9812,1.54,0.11
+H012,Ranchi Cold Hub,Ranchi,1,1,1,1,5000,23.3441,85.3096,2.65,0.16
+H013,Visakhapatnam Port Hub,Visakhapatnam,1,1,1,1,8000,17.6868,83.2185,2.09,0.09
+H014,Raipur Logistics Hub,Raipur,1,1,1,1,6000,21.2514,81.6296,2.45,0.11
+H015,Hyderabad Distribution Hub,Hyderabad,1,1,1,1,9000,17.385,78.4867,1.69,0.2
