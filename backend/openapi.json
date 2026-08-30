@@ -1,0 +1,159 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Karwaan Platform Core APIs",
+    "version": "1.0.0",
+    "description": "Core CRUD endpoints for Shipments, Consolidation Clusters, Delivery Routes, and Incident Reports for the Karwaan Cold-Chain Platform."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3001/api",
+      "description": "Local Development Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "summary": "Authenticate a user",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string" },
+                  "password": { "type": "string" },
+                  "role": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Returns a JWT token" }
+        }
+      }
+    },
+    "/shipments": {
+      "get": {
+        "summary": "List all Shipments",
+        "description": "Returns shipments scoped to the user's role.",
+        "responses": {
+          "200": { "description": "A list of shipments matching the frontend 'Shipment' type" }
+        }
+      }
+    },
+    "/shipments/{id}": {
+      "get": {
+        "summary": "Get a specific shipment",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Detailed shipment including temperature history" }
+        }
+      }
+    },
+    "/shipments/{id}/temperature-log": {
+      "post": {
+        "summary": "Append a new temperature ping",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "temp": { "type": "number" },
+                  "location": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Log appended successfully" }
+        }
+      }
+    },
+    "/clusters": {
+      "get": {
+        "summary": "List Consolidation Clusters",
+        "description": "Returns clusters. Scoped by business role to only include relevant clusters.",
+        "responses": {
+          "200": { "description": "A list of clusters matching the frontend 'ConsolidationCluster' type" }
+        }
+      }
+    },
+    "/clusters/{id}": {
+      "get": {
+        "summary": "Get a specific cluster",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Cluster details including shipment IDs" }
+        }
+      }
+    },
+    "/routes": {
+      "get": {
+        "summary": "List Delivery Routes",
+        "description": "Returns delivery routes and their nested legs.",
+        "responses": {
+          "200": { "description": "A list of routes matching the frontend 'DeliveryRoute' type" }
+        }
+      }
+    },
+    "/routes/{id}": {
+      "get": {
+        "summary": "Get a specific delivery route",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Detailed route including route legs and explanations" }
+        }
+      }
+    },
+    "/incidents": {
+      "get": {
+        "summary": "List Incident Reports",
+        "description": "Returns disruptions, scoped to role context.",
+        "responses": {
+          "200": { "description": "A list of incidents matching the frontend 'IncidentReport' type" }
+        }
+      }
+    },
+    "/incidents/{id}": {
+      "get": {
+        "summary": "Get a specific incident",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Incident details" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,931 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { AppHeader } from '../components/AppHeader';
+import { KarwaanMap } from '../components/KarwaanMap';
+import { MapLegend } from '../components/MapLegend';
+import { FreshnessGauge } from '../components/FreshnessGauge';
+import { dataService } from '../services/dataService';
+import { Shipment, BusinessEntity, User, PerishableCategory } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  Plus,
+  TrendingDown,
+  Leaf,
+  Layers,
+  ThermometerSnowflake,
+  Clock,
+  MapPin,
+  CheckCircle2,
+  AlertCircle,
+  Building2,
+  ArrowRight,
+  ShieldCheck,
+  Truck,
+  X,
+  Sparkles,
+  PackageOpen,
+  ChevronRight
+} from 'lucide-react';
+
+export const BusinessDashboard: React.FC = () => {
+  // ----------------------------------------------------------------------
+  // 1. DATA & STATE (UNTOUCHED TO PRESERVE BACKEND CONNECTIONS)
+  // ----------------------------------------------------------------------
+  const { hasAccess } = useAuth();
+  const [user, setUser] = useState<User | null>(null);
+  const [businesses, setBusinesses] = useState<BusinessEntity[]>([]);
+  const [currentBizId, setCurrentBizId] = useState<string>('');
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  const detailsPanelRef = useRef<HTMLDivElement>(null);
+
+  // New Shipment Modal State
+  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [modalStep, setModalStep] = useState<'intake' | 'processing' | 'results'>('intake');
+  const [aiPlanResults, setAiPlanResults] = useState<any>(null);
+  const [previousAiPlanResults, setPreviousAiPlanResults] = useState<any>(null);
+  const [createdShipmentId, setCreatedShipmentId] = useState<string | null>(null);
+
+  // What-If State
+  const [whatIfPreference, setWhatIfPreference] = useState<string>('balanced');
+  const [whatIfSla, setWhatIfSla] = useState<string>('');
+  const [isRecalculating, setIsRecalculating] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [isDemoLoading, setIsDemoLoading] = useState(false);
+
+  const [newCargo, setNewCargo] = useState({
+    cargoType: '',
+    category: 'berries' as PerishableCategory,
+    weightKg: '' as string | number,
+    volumeCbm: 2.0,
+    totalShelfLifeDays: '' as string | number,
+    slaMaxSpoilagePercent: '' as string | number,
+    slaPriority: 'normal',
+    originName: '',
+    originLat: 20.4625,
+    originLng: 85.8830,
+    originAddress: '',
+    destinationName: '',
+    destinationLat: 20.2961,
+    destinationLng: 85.8245,
+    destinationAddress: '',
+    targetTempMin: '' as string | number,
+    targetTempMax: '' as string | number,
+    deliveryDeadline: '',
+    notes: '',
+  });
+
+  const [notification, setNotification] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Load data function to be reused for demo reset
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const u = await dataService.getActiveUser();
+      const b = await dataService.getBusinesses();
+      const s = await dataService.getShipments();
+
+      if (u) setUser(u);
+      setBusinesses(b);
+      if (u?.businessId) setCurrentBizId(u.businessId);
+      else if (b.length > 0) setCurrentBizId(b[0].id);
+      setShipments(s);
+    } catch (err: any) {
+      console.error("Dashboard failed to load data:", err);
+      setError("Failed to load dashboard data. Please check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const currentBiz = businesses.find((b) => b.id === currentBizId) || businesses[0] || {} as BusinessEntity;
+  const myShipments = shipments.filter((s) => s.businessId === currentBizId);
+
+  // Auto-select first shipment
+  useEffect(() => {
+    if (!selectedShipment && myShipments.length > 0) {
+      setSelectedShipment(myShipments[0]);
+    }
+  }, [myShipments, selectedShipment]);
+
+  // Handle Mobile Scrolling to details when a shipment is clicked
+  const handleSelectShipment = (shipment: Shipment) => {
+    setSelectedShipment(shipment);
+    if (window.innerWidth < 1024 && detailsPanelRef.current) {
+      detailsPanelRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  // Aggregate stats
+  const totalCostSaved = myShipments.reduce((acc, s) => acc + (s.estimatedSoloCostINR - s.consolidatedCostINR), 0);
+  const totalCO2Saved = myShipments.reduce((acc, s) => acc + s.co2SavedKg, 0);
+  const avgFreshness = Math.round(myShipments.reduce((acc, s) => acc + s.freshnessPercent, 0) / (myShipments.length || 1));
+
+  const handleCreateShipment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentBizId) return;
+    try {
+      setModalStep('processing');
+      const daysOffset = 2; 
+      const computedDeadline = new Date(Date.now() + daysOffset * 24 * 3600 * 1000).toISOString();
+
+      const created = await dataService.createShipment({
+        businessId: currentBizId,
+        cargoType: newCargo.cargoType,
+        category: newCargo.category,
+        weightKg: Number(newCargo.weightKg),
+        volumeCbm: Number(newCargo.volumeCbm) || 2.0,
+        originName: newCargo.originName,
+        originLat: newCargo.originLat || 20.4625,
+        originLng: newCargo.originLng || 85.8830,
+        originAddress: newCargo.originAddress || newCargo.originName || 'Odisha Packhouse',
+        destinationName: newCargo.destinationName,
+        destinationLat: newCargo.destinationLat || 20.2961,
+        destinationLng: newCargo.destinationLng || 85.8245,
+        destinationAddress: newCargo.destinationAddress || newCargo.destinationName || 'Odisha Hub',
+        targetTempMin: Number(newCargo.targetTempMin),
+        targetTempMax: Number(newCargo.targetTempMax),
+        totalShelfLifeHours: Number(newCargo.totalShelfLifeDays) * 24,
+        slaMaxDeliveryHours: 48,
+        slaMaxSpoilagePercent: Number(newCargo.slaMaxSpoilagePercent),
+        slaPriority: newCargo.slaPriority || 'normal',
+        deliveryDeadline: computedDeadline,
+        notes: newCargo.notes || 'Registered shipment.',
+      });
+
+      setShipments([created, ...shipments]);
+      setCreatedShipmentId(created.id);
+      setSelectedShipment(created);
+
+      // Call AI Engine
+      const aiResponse = await dataService.getAIPlan(created.id);
+      setAiPlanResults(aiResponse);
+      setModalStep('results');
+      
+    } catch (err: any) {
+      console.error(err);
+      setModalError(err?.message || 'Failed to create shipment or fetch AI plan. Please try again.');
+      setModalStep('intake');
+    }
+  };
+
+  const handleRecalculatePlan = async () => {
+    if (!createdShipmentId) return;
+    setIsRecalculating(true);
+    try {
+      const options = {
+        optimizationPreference: whatIfPreference,
+        slaOverrideHours: whatIfSla ? Number(whatIfSla) : undefined,
+      };
+      const aiResponse = await dataService.getAIPlan(createdShipmentId, options);
+      setPreviousAiPlanResults(aiPlanResults);
+      setAiPlanResults(aiResponse);
+    } catch (err: any) {
+      console.error(err);
+      setModalError(err?.message || 'Failed to recalculate plan. Please try again.');
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
+
+  const confirmAiPlan = async (planId: string) => {
+    const vehicle = aiPlanResults?.recommendedPlan?.vehicle || 'optimized';
+    setIsNewModalOpen(false);
+    setNotification(`Shipment confirmed on ${vehicle} route. Consolidation engine will notify you of cluster assignment.`);
+    setTimeout(() => setNotification(null), 5500);
+
+    // Reset Form
+    setModalStep('intake');
+    setAiPlanResults(null);
+    setCreatedShipmentId(null);
+    setNewCargo({
+      cargoType: '', category: 'berries', weightKg: '', volumeCbm: 2.0,
+      totalShelfLifeDays: '', slaMaxSpoilagePercent: '', slaPriority: 'normal',
+      originName: '', originLat: 20.4625, originLng: 85.8830, originAddress: '',
+      destinationName: '', destinationLat: 20.2961, destinationLng: 85.8245, destinationAddress: '',
+      targetTempMin: '', targetTempMax: '', deliveryDeadline: '', notes: '',
+    });
+  };
+
+  const closeNewModal = () => {
+    setIsNewModalOpen(false);
+    setModalError(null);
+    setTimeout(() => {
+      setModalStep('intake');
+      setAiPlanResults(null);
+      setPreviousAiPlanResults(null);
+    }, 300);
+  };
+
+  // ----------------------------------------------------------------------
+  // 2. ERROR & LOADING STATES
+  // ----------------------------------------------------------------------
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#F8FAF7] flex items-center justify-center p-4">
+        <div className="bg-white border border-[#B3462C]/30 rounded-2xl p-8 shadow-lg text-center max-w-md w-full">
+          <AlertCircle className="w-12 h-12 text-[#B3462C] mx-auto mb-4" />
+          <h2 className="text-[#B3462C] font-bold font-display text-xl mb-2">Connection Error</h2>
+          <p className="text-[#596560] text-sm mb-6 leading-relaxed">{error}</p>
+          <button onClick={() => window.location.reload()} className="w-full px-4 py-3 bg-[#163832] hover:bg-[#0f2622] text-white rounded-xl text-sm font-semibold transition-colors shadow-sm">
+            Retry Connection
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen bg-[#F8FAF7] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 animate-pulse">
+          <div className="w-16 h-16 bg-[#5C7A50]/20 rounded-full flex items-center justify-center">
+            <Building2 className="w-8 h-8 text-[#5C7A50]" />
+          </div>
+          <span className="font-mono text-sm text-[#596560] font-medium tracking-wide">Loading Shipper Dashboard...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // ----------------------------------------------------------------------
+  // 3. MAIN DASHBOARD UI
+  // ----------------------------------------------------------------------
+  return (
+    <div className="min-h-screen bg-[#F8FAF7] text-[#1A211E] flex flex-col font-sans pb-12">
+      <AppHeader user={user} activeRole="business" />
+
+      {/* Global Notification Banner */}
+      {notification && (
+        <div className="bg-[#163832] text-white px-4 py-3 flex items-center justify-center gap-3 text-sm font-medium animate-in slide-in-from-top-2 duration-300 shadow-md z-50 sticky top-0">
+          <Sparkles className="w-4 h-4 text-[#D98E2B]" />
+          <span>{notification}</span>
+        </div>
+      )}
+
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        
+        {/* Header & Controls */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-[#D6DCD4] pb-6">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="font-display font-black text-3xl text-[#163832] tracking-tight">
+                Shipper Portal
+              </h1>
+              <span className="font-mono text-[10px] px-2.5 py-1 bg-[#5C7A50]/15 text-[#5C7A50] border border-[#5C7A50]/20 rounded-full font-bold uppercase tracking-widest shadow-sm">
+                MSME / Farmer View
+              </span>
+            </div>
+            <p className="text-sm text-[#596560] max-w-xl">
+              Track your active consignments, monitor cold-chain compliance, and view real-time freight cost savings generated by AI consolidation.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {hasAccess('cross_tenant_data') && (
+              <div className="flex items-center gap-2 bg-white border border-[#D6DCD4] px-4 py-2.5 rounded-xl shadow-sm text-sm hover:border-[#5C7A50] transition-colors">
+                <Building2 className="w-4 h-4 text-[#596560]" />
+                <select
+                  value={currentBizId}
+                  onChange={(e) => {
+                    setCurrentBizId(e.target.value);
+                    setSelectedShipment(null);
+                  }}
+                  className="bg-transparent text-[#163832] font-semibold focus:outline-none cursor-pointer w-full"
+                >
+                  {businesses.map((biz) => (
+                    <option key={biz.id} value={biz.id}>{biz.name} ({biz.category})</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setModalStep('intake');
+                setIsNewModalOpen(true);
+              }}
+              className="px-6 py-2.5 bg-[#5C7A50] hover:bg-[#435A3A] text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg active:scale-95 touch-manipulation"
+            >
+              <Plus className="w-5 h-5" />
+              <span>New Shipment</span>
+            </button>
+
+            {/* Load Demo Scenario Button */}
+            <button
+              type="button"
+              disabled={isDemoLoading}
+              onClick={async () => {
+                setIsDemoLoading(true);
+                try {
+                  await dataService.resetDemoData();
+                  await loadData();
+                  setNotification('Demo scenario loaded successfully. Showing 4 sample shipments across 2 consolidation clusters.');
+                  setTimeout(() => setNotification(null), 5000);
+                } catch (err) {
+                  console.error('Demo reset failed:', err);
+                  setNotification('Failed to load demo scenario. Please check server connection.');
+                  setTimeout(() => setNotification(null), 4000);
+                } finally {
+                  setIsDemoLoading(false);
+                }
+              }}
+              className="px-4 py-2 bg-[#163832] hover:bg-[#0f2622] disabled:bg-gray-400 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
+            >
+              {isDemoLoading ? (
+                <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Loading...</>
+              ) : (
+                <><Sparkles className="w-4 h-4" /> Load Demo Scenario</>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* 3 Premium KPI Widgets */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="bg-white border border-[#E5EBE3] rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-green-50 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
+            <div className="flex items-center justify-between text-xs font-mono text-[#596560] font-bold tracking-widest uppercase mb-3">
+              <span>Total Freight Savings</span>
+              <div className="bg-green-100 p-2 rounded-lg"><TrendingDown className="w-5 h-5 text-green-700" /></div>
+            </div>
+            <div className="font-display font-black text-3xl text-[#163832]">₹{totalCostSaved.toLocaleString()}</div>
+            <div className="text-sm text-[#5C7A50] font-medium mt-1">
+              {totalCostSaved > 0 ? `vs. individual solo reefer bookings` : 'Book shipments to start saving'}
+            </div>
+          </div>
+
+          <div className="bg-white border border-[#E5EBE3] rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
+            <div className="flex items-center justify-between text-xs font-mono text-[#596560] font-bold tracking-widest uppercase mb-3">
+              <span>Carbon Reduction</span>
+              <div className="bg-emerald-100 p-2 rounded-lg"><Leaf className="w-5 h-5 text-emerald-700" /></div>
+            </div>
+            <div className="font-display font-black text-3xl text-[#163832]">{totalCO2Saved.toFixed(1)} <span className="text-xl text-[#596560]">kg CO₂</span></div>
+            <div className="text-sm text-emerald-700 font-medium mt-1">Via multimodal routing</div>
+          </div>
+
+          <div className="bg-white border border-[#E5EBE3] rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
+            <div className="flex items-center justify-between text-xs font-mono text-[#596560] font-bold tracking-widest uppercase mb-3">
+              <span>Freshness Index</span>
+              <div className="bg-blue-100 p-2 rounded-lg"><ThermometerSnowflake className="w-5 h-5 text-blue-700" /></div>
+            </div>
+            <div className="font-display font-black text-3xl text-[#163832]">{avgFreshness}%</div>
+            <div className="text-sm text-blue-700 font-medium mt-1">Unbroken cold-chain integrity</div>
+          </div>
+        </div>
+
+        {/* Layout Split: Shipments (8 cols) + Selected Details (4 cols) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* LEFT: Consignments List */}
+          <div className="lg:col-span-8 bg-white border border-[#E5EBE3] rounded-3xl p-1 sm:p-6 shadow-sm">
+            <div className="px-4 py-4 sm:px-0 sm:pt-0 sm:pb-5 border-b border-[#E5EBE3] flex items-center justify-between">
+              <div>
+                <h3 className="font-display font-bold text-xl text-[#163832]">Manifest</h3>
+                <p className="text-sm text-[#596560]">Active & completed shipments ({myShipments.length})</p>
+              </div>
+            </div>
+
+            {myShipments.length === 0 ? (
+              <div className="py-16 flex flex-col items-center justify-center text-center">
+                <div className="bg-[#F8FAF7] p-6 rounded-full mb-4">
+                  <PackageOpen className="w-12 h-12 text-[#D6DCD4]" />
+                </div>
+                <h4 className="font-bold text-[#163832] text-lg mb-2">No shipments yet</h4>
+                <p className="text-sm text-[#596560] mb-6 max-w-sm">Create your first shipment to see how AI consolidation can reduce your logistics costs.</p>
+                <button onClick={() => { setModalStep('intake'); setIsNewModalOpen(true); }} className="px-6 py-2.5 bg-[#5C7A50] text-white rounded-xl font-semibold shadow-md">Create Shipment</button>
+              </div>
+            ) : (
+              <>
+                {/* Desktop Table View (Hidden on Mobile) */}
+                <div className="hidden md:block overflow-x-auto mt-4">
+                  <table className="w-full text-left text-sm border-collapse table-auto">
+                    <thead>
+                      <tr className="text-[#596560] font-mono text-[10px] uppercase tracking-widest border-b border-[#E5EBE3]">
+                        <th className="py-3 px-5 font-bold">Consignment</th>
+                        <th className="py-3 px-5 font-bold">Destination</th>
+                        <th className="py-3 px-5 font-bold">Integrity</th>
+                        <th className="py-3 px-5 font-bold">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#F3F5F2]">
+                      {myShipments.map((shipment) => {
+                        const isSelected = selectedShipment?.id === shipment.id;
+                        return (
+                          // THE FIX: Using border-l-4 instead of an absolute <td> to prevent layout breaking
+                          <tr
+                            key={shipment.id}
+                            onClick={() => handleSelectShipment(shipment)}
+                            className={`cursor-pointer transition-all border-l-4 ${isSelected ? 'bg-[#F8FAF7] border-[#5C7A50] shadow-inner' : 'hover:bg-gray-50 border-transparent'}`}
+                          >
+                            <td className="py-4 px-5">
+                              <div className="font-mono font-bold text-[#163832]">{shipment.code}</div>
+                              <div className="text-xs text-[#596560] font-medium mt-0.5">{shipment.cargoType} &bull; {shipment.weightKg}kg</div>
+                            </td>
+                            <td className="py-4 px-5 text-gray-700 font-medium whitespace-nowrap">
+                              {shipment.destination.name.split(',')[0]}
+                            </td>
+                            <td className="py-4 px-5">
+                              <FreshnessGauge percentage={shipment.freshnessPercent} remainingHours={shipment.remainingShelfLifeHours} size="sm" showHours predictedRiskLevel={shipment.spoilageRiskLevel} />
+                            </td>
+                            <td className="py-4 px-5">
+                              {/* THE FIX: whitespace-nowrap prevents the awkward badge splitting */}
+                              <span className={`whitespace-nowrap px-2.5 py-1 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider ${
+                                shipment.status === 'in_transit' ? 'bg-[#5C7A50]/10 text-[#5C7A50] border border-[#5C7A50]/20' : 
+                                shipment.status === 'disrupted' ? 'bg-red-50 text-red-700 border border-red-200' : 
+                                shipment.status === 'delivered' ? 'bg-gray-100 text-gray-700 border border-gray-200' : 'bg-[#D98E2B]/10 text-[#D98E2B] border border-[#D98E2B]/20'
+                              }`}>
+                                {shipment.status.replace('_', ' ')}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Card View (Hidden on Desktop) */}
+                <div className="md:hidden flex flex-col gap-3 p-4">
+                  {myShipments.map((shipment) => {
+                    const isSelected = selectedShipment?.id === shipment.id;
+                    return (
+                      <div
+                        key={shipment.id}
+                        onClick={() => handleSelectShipment(shipment)}
+                        className={`bg-white border rounded-xl p-4 cursor-pointer transition-all shadow-sm ${isSelected ? 'border-[#5C7A50] ring-1 ring-[#5C7A50]' : 'border-[#E5EBE3]'}`}
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <div className="font-mono font-bold text-[#163832]">{shipment.code}</div>
+                            <div className="text-xs text-[#596560] font-medium mt-0.5">{shipment.cargoType}</div>
+                          </div>
+                          <span className={`whitespace-nowrap px-2 py-1 rounded text-[9px] font-mono font-bold uppercase tracking-wider ${shipment.status === 'in_transit' ? 'bg-[#5C7A50]/10 text-[#5C7A50]' : shipment.status === 'disrupted' ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                            {shipment.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs text-gray-600 mb-3">
+                          <span className="flex items-center gap-1"><MapPin className="w-3 h-3"/> {shipment.destination.name.split(',')[0]}</span>
+                          <span className="font-mono font-bold text-[#5C7A50]">+{shipment.costSavingsPercent}% Saved</span>
+                        </div>
+                        <FreshnessGauge percentage={shipment.freshnessPercent} remainingHours={shipment.remainingShelfLifeHours} size="sm" showHours predictedRiskLevel={shipment.spoilageRiskLevel} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* RIGHT: Live Tracking Details (Sticky) */}
+          <div className="lg:col-span-4" ref={detailsPanelRef}>
+            <div className="sticky top-6 space-y-4">
+              {selectedShipment ? (
+                <div className="bg-[#163832] rounded-3xl p-1 shadow-lg overflow-hidden flex flex-col">
+                  {/* Top Dark Header */}
+                  <div className="p-6 text-white">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="font-mono text-[10px] font-bold text-[#D98E2B] uppercase tracking-widest bg-[#D98E2B]/10 px-2 py-1 rounded">Live Telemetry</span>
+                    </div>
+                    <h3 className="font-display font-black text-2xl mb-1">{selectedShipment.code}</h3>
+                    <p className="text-white/70 text-sm font-medium">{selectedShipment.cargoType}</p>
+                    
+                    <div className="mt-6">
+                      <FreshnessGauge percentage={selectedShipment.freshnessPercent} remainingHours={selectedShipment.remainingShelfLifeHours} totalHours={selectedShipment.totalShelfLifeHours} size="lg" showLabel predictedRiskLevel={selectedShipment.spoilageRiskLevel} />
+                    </div>
+                  </div>
+
+                  {/* Bottom Light Section */}
+                  <div className="bg-white rounded-[20px] p-6 flex-1 flex flex-col gap-6">
+                    
+                    {/* AI Consolidation Insight */}
+                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-100 p-5 rounded-xl relative overflow-hidden">
+                      <Sparkles className="absolute top-2 right-2 w-24 h-24 text-green-500/5 -rotate-12" />
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Sparkles className="w-4 h-4 text-[#5C7A50]" />
+                        <span className="font-bold text-[#163832] text-xs uppercase tracking-widest">AI Logistics Value</span>
+                      </div>
+                      <p className="text-sm text-gray-700 leading-relaxed font-medium relative z-10">
+                        {selectedShipment.consolidationReason || `Grouped with local shipments on the cold corridor. Eradicated deadhead mileage to save ${selectedShipment.costSavingsPercent}%.`}
+                      </p>
+                    </div>
+
+                    {/* Financials */}
+                    <div className="flex items-center justify-between px-2">
+                      <div>
+                        <span className="font-mono text-[10px] text-[#596560] font-bold uppercase tracking-widest block mb-1">Solo Charter</span>
+                        <span className="font-mono text-lg text-gray-400 line-through">₹{selectedShipment.estimatedSoloCostINR.toLocaleString()}</span>
+                      </div>
+                      <ArrowRight className="w-5 h-5 text-gray-300 mx-2" />
+                      <div className="text-right">
+                        <span className="font-mono text-[10px] text-[#5C7A50] font-bold uppercase tracking-widest block mb-1">Karwaan Rate</span>
+                        <span className="font-mono text-2xl font-black text-[#5C7A50]">₹{selectedShipment.consolidatedCostINR.toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    {/* Telemetry Grid */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-[#F8FAF7] border border-[#E5EBE3] p-4 rounded-xl text-center overflow-hidden">
+                        <ThermometerSnowflake className="w-4 h-4 text-[#163832] mx-auto mb-1.5 opacity-50" />
+                        <span className="block text-[10px] font-mono font-bold text-[#596560] uppercase tracking-widest mb-1">Ambient</span>
+                        {/* THE FIX: Added truncate to handle wild data glitches like 23342°C */}
+                        <span className="font-bold text-[#163832] text-lg block truncate max-w-full" title={`${selectedShipment.currentTemp}°C`}>
+                          {selectedShipment.currentTemp}°C
+                        </span>
+                      </div>
+                      <div className="bg-[#F8FAF7] border border-[#E5EBE3] p-4 rounded-xl text-center">
+                        <ShieldCheck className="w-4 h-4 text-[#5C7A50] mx-auto mb-1.5 opacity-50" />
+                        <span className="block text-[10px] font-mono font-bold text-[#596560] uppercase tracking-widest mb-1">Status</span>
+                        <span className="font-bold text-[#5C7A50] text-sm mt-1 block leading-tight">Secured</span>
+                      </div>
+                    </div>
+
+                    {/* Map */}
+                    <div className="border border-[#E5EBE3] rounded-xl overflow-hidden shadow-inner mt-2">
+                      <KarwaanMap shipments={[selectedShipment]} selectedShipmentId={selectedShipment.id} height="160px" showAllControls={false} showLegend={false} />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white border border-[#E5EBE3] rounded-3xl p-10 text-center shadow-sm flex flex-col items-center justify-center h-full min-h-[400px]">
+                  <Layers className="w-12 h-12 text-[#D6DCD4] mb-4" />
+                  <h3 className="font-display font-bold text-lg text-[#163832] mb-2">Inspect Consignment</h3>
+                  <p className="text-[#596560] text-sm leading-relaxed">Select any shipment from your manifest on the left to view deep-dive telematics and AI cost analyses.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* ---------------------------------------------------------------------- */}
+      {/* 4. "NEW SHIPMENT" SMART MODAL */}
+      {/* ---------------------------------------------------------------------- */}
+      {isNewModalOpen && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#F8FAF7] rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-full flex flex-col">
+            
+            <div className="bg-white px-6 py-5 flex items-center justify-between border-b border-[#E5EBE3]">
+              <div className="flex items-center gap-3">
+                <div className="bg-[#5C7A50] p-2 rounded-xl text-white shadow-sm"><Plus className="w-5 h-5" /></div>
+                <div>
+                  <h3 className="font-display font-black text-xl text-[#163832]">
+                    {modalStep === 'intake' && 'New Shipment Request'}
+                    {modalStep === 'processing' && 'AI Logistics Engine Running...'}
+                    {modalStep === 'results' && 'Optimal Logistics Plan Ready'}
+                  </h3>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    {(['intake', 'processing', 'results'] as const).map((step, i) => (
+                      <React.Fragment key={step}>
+                        <span className={`text-[10px] font-mono font-bold ${
+                          step === modalStep ? 'text-[#5C7A50]' :
+                          (modalStep === 'results' && step === 'intake') || (modalStep === 'results' && step === 'processing') || (modalStep === 'processing' && step === 'intake') ? 'text-[#163832]/40' :
+                          'text-[#596560]/40'
+                        }`}>
+                          {step === 'intake' ? '① Describe' : step === 'processing' ? '② Analyse' : '③ Compare & Select'}
+                        </span>
+                        {i < 2 && <span className="text-[#D6DCD4] text-[10px]">›</span>}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <button onClick={closeNewModal} className="text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {modalStep === 'intake' && (
+              <>
+                {/* In-modal error banner */}
+                {modalError && (
+                  <div className="mx-6 mt-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-xs text-red-700 font-medium flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{modalError}</span>
+                    <button onClick={() => setModalError(null)} className="ml-auto text-red-400 hover:text-red-600"><X className="w-3.5 h-3.5" /></button>
+                  </div>
+                )}
+                <form onSubmit={handleCreateShipment} className="p-6 overflow-y-auto space-y-8 text-sm flex-1">
+              
+              {/* SECTION 1: Cargo Specs */}
+              <section>
+                <h4 className="font-bold text-[#163832] mb-4 flex items-center gap-2 border-b border-gray-200 pb-2"><PackageOpen className="w-4 h-4 text-[#5C7A50]" /> 1. Cargo Specifications</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Cargo Description</label>
+                    <input type="text" required value={newCargo.cargoType} onChange={(e) => setNewCargo({ ...newCargo, cargoType: e.target.value })} placeholder="e.g. Alphonso Mangoes Grade A" className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-[#5C7A50]/20 focus:border-[#5C7A50] transition-shadow shadow-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Produce Category</label>
+                    <select value={newCargo.category} onChange={(e) => setNewCargo({ ...newCargo, category: e.target.value as PerishableCategory })} className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-[#5C7A50]/20 focus:border-[#5C7A50] shadow-sm">
+                      <option value="berries">Fresh Berries / Strawberries</option>
+                      <option value="mangoes">Alphonso / Tropical Fruits</option>
+                      <option value="grapes">Table Grapes / Stone Fruits</option>
+                      <option value="leafy_greens">Hydroponic Salad Greens</option>
+                      <option value="tomatoes">Exotic Tomatoes & Veggies</option>
+                      <option value="dairy">Artisanal Dairy & Cheese</option>
+                      <option value="mushrooms">Fresh Button Mushrooms</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Weight (kg)</label>
+                    <input type="number" required min="20" max="5000" value={newCargo.weightKg} onChange={(e) => setNewCargo({ ...newCargo, weightKg: e.target.value === '' ? '' : Number(e.target.value) })} className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 font-mono focus:ring-2 focus:ring-[#5C7A50]/20 focus:border-[#5C7A50] shadow-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Target Temp Band (°C)</label>
+                    <div className="flex items-center gap-2">
+                      <input type="number" step="0.5" required value={newCargo.targetTempMin} onChange={(e) => setNewCargo({ ...newCargo, targetTempMin: e.target.value === '' ? '' : Number(e.target.value) })} className="w-1/2 bg-white border border-gray-300 rounded-lg px-3 py-2.5 font-mono shadow-sm" placeholder="Min" />
+                      <span className="text-gray-400 font-medium">to</span>
+                      <input type="number" step="0.5" required value={newCargo.targetTempMax} onChange={(e) => setNewCargo({ ...newCargo, targetTempMax: e.target.value === '' ? '' : Number(e.target.value) })} className="w-1/2 bg-white border border-gray-300 rounded-lg px-3 py-2.5 font-mono shadow-sm" placeholder="Max" />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* SECTION 2: Routing */}
+              <section>
+                <h4 className="font-bold text-[#163832] mb-4 flex items-center gap-2 border-b border-gray-200 pb-2"><MapPin className="w-4 h-4 text-[#D98E2B]" /> 2. Logistics Details</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Pickup Origin</label>
+                    <input type="text" required value={newCargo.originName} onChange={(e) => setNewCargo({ ...newCargo, originName: e.target.value })} placeholder="Farm or Packhouse Name" className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-[#5C7A50]/20 shadow-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Destination Hub</label>
+                    <input type="text" required value={newCargo.destinationName} onChange={(e) => setNewCargo({ ...newCargo, destinationName: e.target.value })} placeholder="Terminal or Market" className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-[#5C7A50]/20 shadow-sm" />
+                  </div>
+                </div>
+              </section>
+
+              {/* SECTION 3: SLA */}
+              <section>
+                <h4 className="font-bold text-[#163832] mb-4 flex items-center gap-2 border-b border-gray-200 pb-2"><ShieldCheck className="w-4 h-4 text-blue-500" /> 3. Service Level Agreement (SLA)</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Total Shelf Life (Days)</label>
+                    <input type="number" required min="1" value={newCargo.totalShelfLifeDays} onChange={(e) => setNewCargo({ ...newCargo, totalShelfLifeDays: e.target.value === '' ? '' : Number(e.target.value) })} className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 font-mono shadow-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Spoilage Integrity Threshold (%)</label>
+                    <input type="number" required min="0" max="100" value={newCargo.slaMaxSpoilagePercent} onChange={(e) => setNewCargo({ ...newCargo, slaMaxSpoilagePercent: e.target.value === '' ? '' : Number(e.target.value) })} className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 font-mono shadow-sm" placeholder="Alert if risk exceeds..." />
+                  </div>
+                </div>
+              </section>
+
+              {/* AI Insight Box */}
+              <div className="bg-gradient-to-r from-green-50 to-[#F8FAF7] border border-green-200 p-4 rounded-xl flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+                <div>
+                  <h5 className="font-bold text-green-800 text-sm mb-1">Instant AI Matching Active</h5>
+                  <p className="text-gray-600 text-xs leading-relaxed">
+                    Upon submission, Karwaan's engine will instantly search for active cold-chain clusters on your corridor to guarantee maximum LTL cost savings without violating your Spoilage Integrity Threshold.
+                  </p>
+                </div>
+              </div>
+
+            </form>
+
+            {/* Footer Actions */}
+            <div className="bg-white p-5 border-t border-[#E5EBE3] flex items-center justify-end gap-3 rounded-b-3xl">
+              <button type="button" onClick={closeNewModal} className="px-5 py-3 text-gray-600 hover:bg-gray-100 rounded-xl font-bold transition-colors">
+                Cancel
+              </button>
+              <button type="submit" onClick={handleCreateShipment} className="px-6 py-3 bg-[#163832] hover:bg-[#0f2622] text-white rounded-xl font-bold shadow-lg shadow-[#163832]/20 flex items-center gap-2 transition-transform hover:-translate-y-0.5">
+                Find Best Plan <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+            </>
+            )}
+
+            {modalStep === 'processing' && (
+              <div className="p-12 flex flex-col items-center justify-center text-center">
+                <div className="w-20 h-20 border-4 border-[#E5EBE3] border-t-[#D98E2B] rounded-full animate-spin mb-6"></div>
+                <h3 className="text-xl font-bold font-display text-[#163832] mb-2">Analyzing Logistics Networks</h3>
+                <p className="text-[#596560] max-w-sm mb-4">The Karwaan engine is evaluating active vehicles, thermal constraints, and multi-modal transfer nodes...</p>
+                <div className="flex gap-2">
+                  <div className="bg-gray-200 w-2 h-2 rounded-full animate-bounce delay-100"></div>
+                  <div className="bg-gray-200 w-2 h-2 rounded-full animate-bounce delay-200"></div>
+                  <div className="bg-gray-200 w-2 h-2 rounded-full animate-bounce delay-300"></div>
+                </div>
+              </div>
+            )}
+
+            {modalStep === 'results' && aiPlanResults && (
+              <div className="p-0 overflow-y-auto flex-1 flex flex-col bg-[#F8FAF7]">
+                
+                {/* Header: RECOMMENDED PLAN */}
+                <div className="bg-[#163832] text-white p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h4 className="font-display font-black text-2xl mb-1">Recommended Plan</h4>
+                      <span className="font-mono text-xs text-[#D98E2B] uppercase tracking-widest">{aiPlanResults.recommendedPlan?.vehicle} Routing</span>
+                    </div>
+                    {aiPlanResults.recommendedPlan?.slaStatus === 'compliant' && <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-md font-mono text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5"><ShieldCheck className="w-3 h-3"/> SLA Compliant</span>}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+                    <div>
+                      <span className="block text-[10px] font-mono text-white/50 uppercase tracking-widest mb-1">Cost</span>
+                      <span className="font-display font-bold text-xl">₹{Math.round(aiPlanResults.recommendedPlan?.cost || 0).toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-mono text-white/50 uppercase tracking-widest mb-1">Est. Departure</span>
+                      <span className="font-bold">
+                        {aiPlanResults.recommendedPlan?.eta && !isNaN(new Date(aiPlanResults.recommendedPlan.eta).getTime())
+                          ? new Date(aiPlanResults.recommendedPlan.eta).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                          : (aiPlanResults.recommendedPlan?.eta || 'ASAP')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-mono text-white/50 uppercase tracking-widest mb-1">Transit Time</span>
+                      <span className="font-bold">{aiPlanResults.recommendedPlan?.transitTimeHours?.toFixed(1)} hrs</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-mono text-white/50 uppercase tracking-widest mb-1">Capacity Util.</span>
+                      <span className="font-bold">{aiPlanResults.recommendedPlan?.capacityUtilization}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Map Section */}
+                <div className="relative h-[280px] w-full border-b border-gray-200 bg-gray-100 shrink-0">
+                  <KarwaanMap 
+                    routes={[{ id: 'rec-route-1', name: 'Recommended Route', legs: aiPlanResults.recommendedPlan?.route?.legs || [], status: 'active', activeIncidentId: null } as any]} 
+                    selectedRouteId="rec-route-1"
+                    shipments={[{ id: 'rec-ship-1', code: 'NEW', cargoType: newCargo.cargoType, category: newCargo.category, freshnessPercent: 100, origin: { lat: newCargo.originLat, lng: newCargo.originLng, name: newCargo.originName }, destination: { lat: newCargo.destinationLat, lng: newCargo.destinationLng, name: newCargo.destinationName } } as any]}
+                    selectedShipmentId="rec-ship-1"
+                    height="100%" 
+                    showAllControls={false} 
+                    showLegend={true} 
+                  />
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {/* Risks */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     <div className="bg-white border border-[#E5EBE3] p-4 rounded-xl shadow-sm">
+                       <div className="flex justify-between items-center mb-2">
+                         <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Predictive Delay Risk</span>
+                         <span className="text-xs font-bold text-amber-600">{aiPlanResults.recommendedPlan?.delayProbability?.toFixed(1)}%</span>
+                       </div>
+                       <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                         <div className="bg-amber-400 h-full rounded-full" style={{ width: `${Math.min(100, aiPlanResults.recommendedPlan?.delayProbability || 0)}%` }}></div>
+                       </div>
+                     </div>
+                     <div className="bg-white border border-[#E5EBE3] p-4 rounded-xl shadow-sm">
+                       <div className="flex justify-between items-center mb-2">
+                         <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Spoilage Risk Prob.</span>
+                         <span className="text-xs font-bold text-red-600">{aiPlanResults.recommendedPlan?.spoilageProbability?.toFixed(1)}%</span>
+                       </div>
+                       <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                         <div className="bg-red-400 h-full rounded-full" style={{ width: `${Math.min(100, aiPlanResults.recommendedPlan?.spoilageProbability || 0)}%` }}></div>
+                       </div>
+                     </div>
+                  </div>
+
+                  {/* Why this plan? */}
+                  <div className="bg-gradient-to-br from-[#F8FAF7] to-green-50 border border-green-200 rounded-xl p-5 shadow-sm">
+                    <h5 className="font-bold text-[#163832] mb-2 flex items-center gap-2"><Sparkles className="w-4 h-4 text-[#5C7A50]" /> WHY THIS PLAN?</h5>
+                    <p className="text-sm text-gray-700 leading-relaxed font-medium">
+                      {aiPlanResults.recommendedPlan?.explanation?.multimodalAdvantage || aiPlanResults.recommendedPlan?.explanation?.departureReasoning || 'The AI Engine determined this is the mathematically optimal consolidation route prioritizing SLA compliance and cost reduction.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Alternative Plans */}
+                {aiPlanResults.candidatePlans && aiPlanResults.candidatePlans.length > 0 && (
+                  <div className="p-6 pt-0">
+                    <h5 className="font-bold text-[#163832] mb-3 text-sm flex items-center gap-2 border-b border-[#E5EBE3] pb-2">
+                      <Layers className="w-4 h-4 text-[#596560]" />
+                      Alternative Plans Comparison
+                    </h5>
+                    <div className="overflow-x-auto bg-white rounded-xl shadow-sm border border-[#E5EBE3]">
+                      <table className="w-full text-left text-sm border-collapse">
+                        <thead>
+                          <tr className="text-[#596560] font-mono text-[10px] uppercase tracking-widest bg-gray-50 border-b border-[#E5EBE3]">
+                            <th className="py-3 px-4 font-bold">Plan Type</th>
+                            <th className="py-3 px-4 font-bold text-right">Cost (₹)</th>
+                            <th className="py-3 px-4 font-bold text-center">Delay Risk</th>
+                            <th className="py-3 px-4 font-bold text-center">Spoilage Risk</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="bg-[#E8F5E9]/30 border-b border-[#E5EBE3]">
+                            <td className="py-3 px-4 font-bold text-[#163832] flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-[#5C7A50]"></span>
+                              Recommended ({aiPlanResults.recommendedPlan?.vehicle})
+                            </td>
+                            <td className="py-3 px-4 font-bold text-[#5C7A50] text-right">₹{Math.round(aiPlanResults.recommendedPlan?.cost || 0).toLocaleString()}</td>
+                            <td className="py-3 px-4 text-center font-medium text-amber-600">{aiPlanResults.recommendedPlan?.delayProbability?.toFixed(1)}%</td>
+                            <td className="py-3 px-4 text-center font-medium text-red-600">{aiPlanResults.recommendedPlan?.spoilageProbability?.toFixed(1)}%</td>
+                          </tr>
+                          {aiPlanResults.candidatePlans.slice(0, 3).map((alt: any, idx: number) => (
+                            <tr key={idx} className="border-b last:border-b-0 border-[#E5EBE3] hover:bg-gray-50">
+                              <td className="py-3 px-4 font-medium text-gray-700 capitalize flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-gray-300"></span>
+                                {alt.type} Plan
+                              </td>
+                              <td className="py-3 px-4 font-mono text-gray-600 text-right">₹{Math.round(alt.cost).toLocaleString()}</td>
+                              <td className="py-3 px-4 text-center text-gray-500">{Math.round(alt.delayRisk?.score || 0)}%</td>
+                              <td className="py-3 px-4 text-center text-gray-500">{Math.round(alt.spoilageRisk?.score || 0)}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* What-If Engine Sandbox */}
+                <div className="bg-white border-t border-[#D6DCD4] p-6 shadow-[0_-4px_10px_-5px_rgba(0,0,0,0.05)] z-10 relative">
+                  <h5 className="font-display font-bold text-[#163832] mb-4 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#D98E2B]" /> What-If AI Scenarios
+                  </h5>
+                  
+                  {previousAiPlanResults && previousAiPlanResults.recommendedPlan?.id !== aiPlanResults.recommendedPlan?.id && (
+                    <div className="mb-5 bg-gradient-to-r from-[#163832] to-[#2A4C46] text-white p-4 rounded-xl shadow-lg border border-[#5C7A50]">
+                      <h6 className="font-mono text-[10px] font-bold text-[#D98E2B] uppercase tracking-widest mb-2">Engine Output Changed</h6>
+                      <div className="grid grid-cols-2 gap-4 items-center">
+                        <div>
+                          <div className="text-xs text-white/70 mb-0.5">Previous Route</div>
+                          <div className="font-bold text-lg line-through text-white/50">{previousAiPlanResults.recommendedPlan?.vehicle} Route</div>
+                          <div className="font-mono text-sm text-white/50">₹{Math.round(previousAiPlanResults.recommendedPlan?.cost || 0).toLocaleString()}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-white/70 mb-0.5">New Recommended Route</div>
+                          <div className="font-bold text-lg text-emerald-400">{aiPlanResults.recommendedPlan?.vehicle} Route</div>
+                          <div className="font-mono text-sm text-emerald-400">₹{Math.round(aiPlanResults.recommendedPlan?.cost || 0).toLocaleString()}</div>
+                        </div>
+                      </div>
+                      <div className="mt-3 bg-black/20 p-2 rounded text-xs text-gray-300 font-medium">
+                        <strong>Why it changed:</strong> {aiPlanResults.recommendedPlan?.explanation?.engineStrategy}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                    <div className="md:col-span-5">
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Optimization Target</label>
+                      <select 
+                        value={whatIfPreference}
+                        onChange={(e) => setWhatIfPreference(e.target.value)}
+                        className="w-full bg-[#F8FAF7] border border-[#D6DCD4] rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-[#5C7A50] text-sm"
+                      >
+                        <option value="balanced">Balanced (Cost vs Risk)</option>
+                        <option value="lowest_cost">Aggressive Lowest Cost</option>
+                        <option value="fastest">Fastest Speed (Minimize Delay)</option>
+                        <option value="safest">Safest (Minimize Spoilage)</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-4">
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Override Max SLA (hrs)</label>
+                      <input 
+                        type="number" 
+                        placeholder="e.g. 24"
+                        value={whatIfSla}
+                        onChange={(e) => setWhatIfSla(e.target.value)}
+                        className="w-full bg-[#F8FAF7] border border-[#D6DCD4] rounded-lg px-4 py-2.5 font-mono focus:ring-2 focus:ring-[#5C7A50] text-sm"
+                      />
+                    </div>
+                    <div className="md:col-span-3">
+                      <button 
+                        onClick={handleRecalculatePlan}
+                        disabled={isRecalculating}
+                        className="w-full px-4 py-2.5 bg-[#596560] hover:bg-[#1A211E] disabled:bg-gray-300 text-white rounded-lg font-bold shadow transition-colors flex items-center justify-center gap-2"
+                      >
+                        {isRecalculating ? (
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        ) : (
+                          <><Layers className="w-4 h-4" /> Recalculate</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="p-5 border-t border-gray-200 flex justify-end gap-3 bg-white mt-auto">
+                  <button onClick={closeNewModal} className="px-5 py-3 text-gray-600 hover:bg-gray-100 rounded-xl font-bold transition-colors">
+                    Cancel Request
+                  </button>
+                  <button onClick={() => confirmAiPlan(aiPlanResults.recommendedPlan?.id)} className="px-6 py-3 bg-[#D98E2B] hover:bg-[#C27E25] text-white rounded-xl font-bold shadow-md flex items-center gap-2 transition-transform hover:-translate-y-0.5">
+                    <CheckCircle2 className="w-5 h-5" /> Confirm AI Plan
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

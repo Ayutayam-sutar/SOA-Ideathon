@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  --color-karwaan-bg: #F3F5F2;
+  --color-karwaan-teal: #163832;
+  --color-karwaan-teal-dark: #0F2622;
+  --color-karwaan-teal-light: #245249;
+  --color-karwaan-sage: #5C7A50;
+  --color-karwaan-sage-dark: #435A3A;
+  --color-karwaan-sage-light: #769669;
+  --color-karwaan-amber: #D98E2B;
+  --color-karwaan-amber-dark: #B5721C;
+  --color-karwaan-amber-light: #EBB05E;
+  --color-karwaan-brick: #B3462C;
+  --color-karwaan-brick-dark: #8F341E;
+  --color-karwaan-charcoal: #1A211E;
+  --color-karwaan-muted: #596560;
+  --color-karwaan-border: #D6DCD4;
+  --color-karwaan-card: #FFFFFF;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-karwaan-bg);
+    color: var(--color-karwaan-charcoal);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  code, pre, .font-data {
+    font-family: var(--font-mono);
+  }
+}
+
+/* Custom scrollbars for industrial aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #E5EBE3;
+}
+::-webkit-scrollbar-thumb {
+  background: #B6C2B4;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8F9E8D;
+}
+
+/* Leaflet custom map markers and styling */
+.leaflet-popup-content-wrapper {
+  background: #FFFFFF !important;
+  color: #1A211E !important;
+  border: 1px solid #D6DCD4 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 12px rgba(22, 56, 50, 0.08) !important;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-container {
+  font-family: var(--font-sans) !important;
+}
+

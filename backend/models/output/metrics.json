@@ -1,0 +1,58 @@
+{
+    "dataset_size": 12000,
+    "train_size": 9600,
+    "test_size": 2400,
+    "roc_auc": 0.7782583814975879,
+    "classification_report": {
+        "0": {
+            "precision": 0.7302325581395349,
+            "recall": 0.8134715025906736,
+            "f1-score": 0.7696078431372549,
+            "support": 1351.0
+        },
+        "1": {
+            "precision": 0.7184357541899441,
+            "recall": 0.6129647283126788,
+            "f1-score": 0.661522633744856,
+            "support": 1049.0
+        },
+        "accuracy": 0.7258333333333333,
+        "macro avg": {
+            "precision": 0.7243341561647395,
+            "recall": 0.7132181154516761,
+            "f1-score": 0.7155652384410555,
+            "support": 2400.0
+        },
+        "weighted avg": {
+            "precision": 0.7250763717465679,
+            "recall": 0.7258333333333333,
+            "f1-score": 0.7223655995319939,
+            "support": 2400.0
+        }
+    },
+    "confusion_matrix": [
+        [
+            1099,
+            252
+        ],
+        [
+            406,
+            643
+        ]
+    ],
+    "features": [
+        "product_type",
+        "weight_kg",
+        "transport_mode",
+        "base_transit_hr",
+        "required_min_temp_c",
+        "required_max_temp_c",
+        "pickup_hour",
+        "delivery_deadline_hr",
+        "transfer_count",
+        "rain_flag",
+        "congestion_index",
+        "historical_route_reliability",
+        "route_reliability_feature"
+    ]
+}
