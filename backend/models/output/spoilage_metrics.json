@@ -1,0 +1,58 @@
+{
+    "dataset_size": 11995,
+    "train_size": 9596,
+    "test_size": 2399,
+    "roc_auc": 0.8577514669629527,
+    "classification_report": {
+        "0": {
+            "precision": 0.8846611177170036,
+            "recall": 0.8576368876080691,
+            "f1-score": 0.8709394205443372,
+            "support": 1735.0
+        },
+        "1": {
+            "precision": 0.6555090655509066,
+            "recall": 0.7078313253012049,
+            "f1-score": 0.6806661839246922,
+            "support": 664.0
+        },
+        "accuracy": 0.8161734055856606,
+        "macro avg": {
+            "precision": 0.7700850916339551,
+            "recall": 0.7827341064546369,
+            "f1-score": 0.7758028022345147,
+            "support": 2399.0
+        },
+        "weighted avg": {
+            "precision": 0.8212359561337237,
+            "recall": 0.8161734055856606,
+            "f1-score": 0.8182752149939228,
+            "support": 2399.0
+        }
+    },
+    "confusion_matrix": [
+        [
+            1488,
+            247
+        ],
+        [
+            194,
+            470
+        ]
+    ],
+    "features": [
+        "product_type",
+        "required_min_temp_c",
+        "required_max_temp_c",
+        "observed_avg_temp",
+        "observed_max_temp",
+        "observed_min_temp",
+        "temperature_excursion_minutes",
+        "observed_excursion_count",
+        "base_transit_hr",
+        "delay_minutes",
+        "transfer_count",
+        "weight_kg"
+    ],
+    "label_source": "synthetic (transparent probabilistic generation)"
+}

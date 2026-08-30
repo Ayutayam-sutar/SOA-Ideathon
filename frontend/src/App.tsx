@@ -1,0 +1,65 @@
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+
+import { LandingPage } from "./pages/LandingPage";
+import { RoleSelectionPage } from "./pages/RoleSelectionPage";
+import { LoginPage } from "./pages/LoginPage";
+
+import { AdminLayout } from "./components/AdminLayout";
+import { AdminDashboard } from "./pages/admin/AdminDashboard";
+import { AdminShipments } from "./pages/admin/AdminShipments";
+import { AdminClusters } from "./pages/admin/AdminClusters";
+import { AdminRoutes } from "./pages/admin/AdminRoutes";
+import { AdminIncidents } from "./pages/admin/AdminIncidents";
+import { AdminMap } from "./pages/admin/AdminMap";
+
+import { BusinessDashboard } from "./pages/BusinessDashboard";
+import { AgentDashboard } from "./pages/AgentDashboard";
+import { AuthProvider } from "./contexts/AuthContext";
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+      <Routes>
+        {/* Public */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/select-role" element={<RoleSelectionPage />} />
+        <Route path="/login/:role" element={<LoginPage />} />
+        <Route
+          path="/login"
+          element={<Navigate to="/select-role" replace />}
+        />
+
+        {/* ================= ADMIN ================= */}
+        <Route path="/admin" element={<AdminLayout />}>
+          {/* /admin */}
+          <Route index element={<AdminDashboard />} />
+
+          {/* /admin/shipments */}
+          <Route path="shipments" element={<AdminShipments />} />
+
+          {/* /admin/clusters */}
+          <Route path="clusters" element={<AdminClusters />} />
+
+          {/* /admin/routes */}
+          <Route path="routes" element={<AdminRoutes />} />
+
+          {/* /admin/incidents */}
+          <Route path="incidents" element={<AdminIncidents />} />
+
+          {/* /admin/map */}
+          <Route path="map" element={<AdminMap />} />
+        </Route>
+
+        {/* Other roles */}
+        <Route path="/business" element={<BusinessDashboard />} />
+        <Route path="/agent" element={<AgentDashboard />} />
+
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+    </AuthProvider>
+  );
+}
