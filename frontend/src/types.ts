@@ -2,7 +2,7 @@ export type UserRole = 'admin' | 'business' | 'agent';
 
 export interface User {
   id: string;
-  name: string;
+  name?: string;
   email: string;
   role: UserRole;
   businessId?: string;

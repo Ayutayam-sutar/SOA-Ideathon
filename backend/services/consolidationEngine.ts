@@ -46,7 +46,7 @@ const KNOWN_COORDINATES: Record<string, { lat: number; lng: number; name: string
   'jajpur': { lat: 20.8444, lng: 86.3364, name: 'Jajpur Hub' },
   'bhadrak': { lat: 21.0544, lng: 86.4955, name: 'Bhadrak Terminal' }
 };
-// Haversine distance in km
+// Practical highway & rail routing corridor distance in km (applying standard road detour circuity factor of 1.18 to straight-line distance)
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; 
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -55,7 +55,9 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): nu
             Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
             Math.sin(dLon/2) * Math.sin(dLon/2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return Math.max(15, Math.round(R * c));
+  const straightLineKm = R * c;
+  // Route network circuity factor of 1.18 for realistic highway road & rail routing
+  return Math.max(20, Math.round(straightLineKm * 1.18));
 }
 
 // Case-insensitive locator for Hubs & GPS coordinates
@@ -292,9 +294,7 @@ export const consolidationEngine = {
       engineStrategyMsg = 'Engine re-weighted to strictly minimize spoilage and temperature risks.';
     }
 
-    const spoilageRisk = repShipmentId 
-      ? await riskPredictionService.predictSpoilageRisk(repShipmentId)
-      : { score: 30 }; 
+
 
     // Candidate Transport Plans
     const candidates: any[] = [];
@@ -372,10 +372,11 @@ export const consolidationEngine = {
       ]
     });
 
-    let bestCandidate = null;
     let bestScore = Infinity;
-    let bestDelayRisk = null;
-    let allScoredCandidates: any[] = [];
+    let bestCandidate: any = null;
+    let bestDelayRisk: any = null;
+    let bestSpoilageRisk: any = null;
+    const allScoredCandidates: any[] = [];
 
     const maxCost = Math.max(...candidates.map(c => c.cost));
     const maxDuration = Math.max(...candidates.map(c => c.durationHours));
@@ -391,6 +392,10 @@ export const consolidationEngine = {
       }
 
       const delayRisk = await riskPredictionService.predictDelayRisk(routeId, cand.legs, repShipmentId);
+      
+      const spoilageRisk = repShipmentId 
+        ? await riskPredictionService.predictSpoilageRisk(repShipmentId, cand.durationHours, cand.transfers, delayRisk.expectedDelayMinutes)
+        : { score: 30, level: 'medium', projectedFreshnessAtDelivery: 90, contributingFactors: [] };
       
       const normalizedCost = maxCost > 0 ? cand.cost / maxCost : 0;
       const normalizedDuration = maxDuration > 0 ? cand.durationHours / maxDuration : 0;
@@ -418,12 +423,16 @@ export const consolidationEngine = {
         bestScore = score;
         bestCandidate = cand;
         bestDelayRisk = delayRisk;
+        bestSpoilageRisk = spoilageRisk;
       }
     }
 
     if (!bestCandidate) {
       bestCandidate = candidates[0];
       bestDelayRisk = await riskPredictionService.predictDelayRisk(routeId, bestCandidate.legs);
+      bestSpoilageRisk = repShipmentId 
+        ? await riskPredictionService.predictSpoilageRisk(repShipmentId, bestCandidate.durationHours, bestCandidate.transfers, bestDelayRisk?.expectedDelayMinutes || 0)
+        : { score: 30, level: 'medium', projectedFreshnessAtDelivery: 90, contributingFactors: [] };
     }
 
     let explanationMsg = '';
@@ -452,7 +461,7 @@ export const consolidationEngine = {
       cost: bestCandidate.cost,
       durationHours: bestCandidate.durationHours,
       delayRisk: bestDelayRisk,
-      spoilageRisk: spoilageRisk,
+      spoilageRisk: bestSpoilageRisk,
       score: bestScore,
       alternativePlans: allScoredCandidates.filter(c => c !== bestCandidate),
       explanation: {

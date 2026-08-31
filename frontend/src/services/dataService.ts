@@ -160,6 +160,11 @@ class DataService {
   }
 
   // Recommendations
+  public async recommendGrouping(): Promise<any[]> {
+    const res = await apiClient.post('/recommendations/grouping', {});
+    return Array.isArray(res) ? res : res.clusters || res;
+  }
+
   public async recommendRoute(clusterId: string, originName: string, destName: string): Promise<any> {
     return apiClient.post('/recommendations/route', { clusterId, originName, destName });
   }

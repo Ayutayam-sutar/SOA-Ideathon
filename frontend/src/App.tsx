@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LandingPage } from "./pages/LandingPage";
 import { RoleSelectionPage } from "./pages/RoleSelectionPage";
 import { LoginPage } from "./pages/LoginPage";
+import { RegisterPage } from "./pages/RegisterPage";
 
 import { AdminLayout } from "./components/AdminLayout";
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
@@ -30,6 +31,7 @@ export default function App() {
           path="/login"
           element={<Navigate to="/select-role" replace />}
         />
+        <Route path="/register" element={<RegisterPage />} />
 
         {/* ================= ADMIN ================= */}
         <Route path="/admin" element={<AdminLayout />}>

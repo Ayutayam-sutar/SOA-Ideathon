@@ -1,320 +1,324 @@
-# Karwaan Technical Handover Runbook
+# KARWAAN - COMPLETE TECHNICAL HANDOVER / RUNBOOK
 
-This is the definitive technical handover document for the **Karwaan** AI-powered multimodal freight consolidation and cold-chain risk prediction platform. It provides a complete reference for installing, seeding, running, retraining, and auditing the system.
+## QUICK START: 5-MINUTE RUN GUIDE
 
----
+If you just want to run the Karwaan application locally, follow these steps. For full architecture, ML training, and troubleshooting, read the complete document below.
 
-## PART 0 — 5-MINUTE QUICK START
+**Prerequisites:**
+- Node.js (v20+ recommended)
+- Python (v3.10+ recommended) with pip
+- A Neon Serverless Postgres `DATABASE_URL` (or any Postgres DB)
 
-### 1. Prerequisites
-*   **Node.js**: Version `v18.x` or `v20.x`
-*   **Python**: Version `v3.10.x` or `v3.11.x` (with `pip` and virtual environment support)
-*   **Database**: PostgreSQL connection URI (Neon PostgreSQL cloud instance recommended)
-*   **Git**: CLI installed
+**Environment Setup:**
+1. Clone the repository and open the root folder.
+2. In `backend/`, copy `.env.example` to `.env` and set your `DATABASE_URL`.
+3. In `frontend/`, copy `.env.example` to `.env` (if applicable) or use default local settings.
 
-### 2. Fast Setup Commands
-
-From the workspace root directory (`d:\HACKATHON PROJECTS 2026\SIH 2026\SOA-Ideathon`):
-
-```bash
-# 1. Install Workspace Root & Frontend Dependencies
+**Backend Setup (Terminal 1):**
+```powershell
+cd backend
 npm install
+npm run db:generate
+npm run db:push
+npm run seed
+npm run dev
+```
+*(Backend runs on `http://localhost:3001`)*
+
+**Frontend Setup (Terminal 2):**
+```powershell
 cd frontend
 npm install
-cd ../backend
-npm install
-
-# 2. Configure Environment Variables
-# Copy template and fill DATABASE_URL and JWT_SECRET
-cp .env.example .env
-
-# 3. Apply Schema Migrations
-npx drizzle-kit push:pg
-
-# 4. Import & Seed CSV Data
-npx ts-node db/seed.ts
-
-# 5. Set up Python ML Subprocesses
-# Install Pandas, Scikit-Learn, Joblib
-cd models
-python -m venv venv
-venv\Scripts\activate
-pip install pandas numpy scikit-learn joblib
-
-# 6. Train Random Forest Models (Generates .pkl files)
-python train_delay_model.py
-python train_spoilage_model.py
-cd ../..
+npm run dev
 ```
+*(Frontend runs on `http://localhost:3000` or `http://localhost:5173` depending on Vite binding)*
 
-### 3. Running the Application
-Open two separate terminal windows:
-
-*   **Terminal 1 (Backend Server)**:
-    ```bash
-    cd backend
-    npm run dev
-    ```
-    *Listens on `http://localhost:3001`*
-
-*   **Terminal 2 (Vite Frontend)**:
-    ```bash
-    cd frontend
-    npm run dev
-    ```
-    *Vite server opens at `http://localhost:5173`*
-
-### 4. Backdoor Demo Credentials
-*   **Admin Mode**: `admin@karwaan.in` / `demo-access-2026`
-*   **Business Mode**: `logistics@sahyadri.in` / `demo-access-2026` (Linked to `BIZ-01`)
-*   **Agent/Driver Mode**: `agent1@karwaan.in` / `demo-access-2026`
-
----
-
-## PART 1 — PROJECT AUDIT SUMMARY
-
-An audit of the active codebase confirms:
-1.  **Frontend**: Built on React, TypeScript, and Vite. Uses TailwindCSS for utility classes. Map component implements Leaflet hooks.
-2.  **Backend**: Powered by Express + tsx watcher. Integrates Neon PostgreSQL via Drizzle ORM. Spawns Python subprocesses dynamically for machine learning scoring.
-3.  **Data Models**: Database stores normalized entries (businesses, shipments, clusters, vehicles, routes, route_legs, incidents). Python ML models (`delay_rf_model.pkl`, `spoilage_rf_model.pkl`) load Random Forest classifiers built from historical CSV tables.
-4.  **Decision Engine**: A rules-based spatial-temperature filter groups shipments before applying a multi-objective weighted utility optimizer.
-
----
-
-## PART 2 — EXACT PROJECT DIRECTORY TREE
-
-```
-.
-├── backend/
-│   ├── controllers/
-│   │   ├── authController.ts         # User logins and session token issuance
-│   │   ├── demoController.ts         # Seed resetting endpoints
-│   │   ├── recommendationsController.ts # Optimizing candidate plans
-│   │   └── shipmentsController.ts    # Validating and logging shipment intake
-│   ├── db/
-│   │   ├── index.ts                  # PostgreSQL connection pooled driver
-│   │   ├── schema.ts                 # Drizzle relational schemas
-│   │   └── seed.ts                   # CSV mapping ingestion scripts
-│   ├── middleware/
-│   │   ├── auth.ts                   # JWT checks
-│   │   └── fieldMasking.ts           # Tenant boundary data filters
-│   ├── models/
-│   │   ├── predict_delay.py          # Python delay classifier wrapper
-│   │   ├── predict_spoilage.py       # Python spoilage classifier wrapper
-│   │   ├── train_delay_model.py      # Delay trainer
-│   │   └── train_spoilage_model.py   # Spoilage labeler & trainer
-│   ├── services/
-│   │   ├── consolidationEngine.ts    # Grouping matching and legs generation
-│   │   ├── locationHelper.ts         # Geographical coordinates library
-│   │   └── riskPrediction.ts         # Subprocess ML caller
-│   ├── package.json
-│   └── server.ts                     # Main entry port binding
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   └── MapView.tsx           # Leaflet path renderer
-│   │   ├── pages/
-│   │   │   ├── LandingPage.tsx       # Public branding landing portal
-│   │   │   ├── RoleSelectionPage.tsx # Backdoor credentials autofills
-│   │   │   ├── BusinessDashboard.tsx # MSME shipment logs and planner
-│   │   │   └── AdminDashboard.tsx    # System telemetries and metrics
-│   │   └── App.tsx                   # Routes definitions
-│   └── package.json
-├── hubs_clean.csv                    # Locations catalog
-├── vehicles_clean.csv                # Fleet parameters
-└── current_shipments_clean.csv       # Active shipment states
-```
-
----
-
-## PART 3 — WHAT IS KARWAAN?
-
-Karwaan addresses **SOAIDEATHON-S17: AI-Based Multimodal Freight Consolidation and Cold-Chain Risk Prediction for MSME and Agri Logistics**.
-
-### Real-World Problems Solved:
-1.  **High Logistics Overhead**: MSME agri-shippers frequently pay full-truckload (FTL) rates for less-than-truckload (LTL) shipments. Karwaan matches compatible shippers to consolidate cargo.
-2.  **Cold-Chain Decay**: Spoilage is common during multi-hour transits. Karwaan predicts spoilage risk using target temperature bounds.
-3.  **Multimodal Utilization**: Integrating road transits with Kisan Rail lines reduces shipping costs and CO₂ emissions.
-
-### Security Boundaries:
-*   **MSMEs** only see their own cargo details and explainable recommendations. Raw scores and competitor pricing are masked.
-*   **Admins** view system-wide coordinates, incidents, fleet metrics, and raw scoring details.
-
----
-
-## PART 4 — SYSTEM ARCHITECTURE
-
-```
-                                +---------------------------+
-                                |  MSME / Admin Browser UI  |
-                                +---------------------------+
-                                              |
-                                              v (HTTP Request)
-                                +---------------------------+
-                                |  Express Backend Server   |
-                                +---------------------------+
-                                 /            |            \
-                                /             |             \
-                               v              v              v
-                   +---------------+  +---------------+  +------------------------+
-                   |  Drizzle ORM  |  | Consolidation |  | Python subprocess ML   |
-                   |  (PostgreSQL) |  |   Engine      |  | (RandomForest Models)  |
-                   +---------------+  +---------------+  +------------------------+
-```
-
----
-
-## PART 5 — FRONTEND DOCUMENTATION
-
-### 1. Landing Page
-*   **Route**: `/`
-*   **Filename**: `frontend/src/pages/LandingPage.tsx`
-*   **Access**: Public.
-*   **Details**: Displays the value proposition: *"AI-powered multimodal freight consolidation and cold-chain risk intelligence for MSMEs."*
-*   **Action**: Clicking "Launch Portal" routes users to `/roles`.
-
-### 2. Role Selection Page
-*   **Route**: `/roles`
-*   **Filename**: `frontend/src/pages/RoleSelectionPage.tsx`
-*   **Details**: Provides autofill selectors for Admin, Business (`logistics@sahyadri.in`), and Driver roles with the universal password (`demo-access-2026`). Routes to corresponding dashboards upon success.
-
-### 3. Business Dashboard
-*   **Route**: `/dashboard`
-*   **Filename**: `frontend/src/pages/BusinessDashboard.tsx`
-*   **Details**:
-    *   Allows creating a shipment with strict temp limits and SLA parameters.
-    *   "Find Best Plan" triggers the AI planning modal.
-    *   Displays alternative routes, Leaflet leg coordinate maps, risk percentages, and explanations.
-
-### 4. Admin Dashboard
-*   **Route**: `/admin`
-*   **Filename**: `frontend/src/pages/AdminDashboard.tsx`
-*   **Details**: Monitor all consolidated clusters, system-wide delay alerts, active incidents, and raw multi-objective cost/time trade-off scores.
-
----
-
-## PART 6 — MSME USER JOURNEY
-
-```
-[Create Shipment Form] -> POST /api/shipments -> Written to Drizzle table "shipments"
-                               |
-                               v
-                     POST /api/recommendations/plan
-                               |
-       +-----------------------+-----------------------+
-       |                                               |
-       v                                               v
-[consolidationEngine.recommendGrouping]      [riskPredictionService.predictCombinedRisk]
-Check temp/route/capacity compatibility      Execute predict_spoilage/predict_delay python script
-       |                                               |
-       +-----------------------+-----------------------+
-                               |
-                               v
-                     [recommendRoute Optimizer]
-                Apply Weighted Multi-Objective Score
-                               |
-                               v
-                     [Response JSON Payload]
-               Mask internal scores; Return plans
-```
-
----
-
-## PART 7 — DATABASE DATA DICTIONARY
-
-```
-+------------------------+-------------------+------------------------------+
-| Table Name             | Primary Key       | Foreign Keys                 |
-+------------------------+-------------------+------------------------------+
-| businesses             | id (varchar)      | None                         |
-| users                  | id (varchar)      | businessId -> businesses.id  |
-| hubs                   | id (varchar)      | None                         |
-| vehicles               | id (varchar)      | None                         |
-| shipments              | id (varchar)      | businessId -> businesses.id  |
-| temperature_log_entries| id (uuid)         | shipmentId -> shipments.id   |
-| consolidation_clusters | id (varchar)      | None                         |
-| cluster_shipments      | (cluster,shipment)| clusterId, shipmentId        |
-| delivery_routes        | id (varchar)      | clusterId -> clusters.id     |
-| route_legs             | id (varchar)      | routeId -> routes.id         |
-| incident_reports       | id (varchar)      | shipmentId -> shipments.id   |
-+------------------------+-------------------+------------------------------+
-```
-
----
-
-## PART 8 — CSV DATA REFERENCE
-
-The application seeds its initial database constraints using raw CSV files located at the workspace root:
-
-1.  **`hubs_clean.csv`**: Contains physical hub names, coordinates, and rail access details.
-2.  **`vehicles_clean.csv`**: Contains fleet capacity limits and temperature ranges.
-3.  **`current_shipments_clean.csv`**: Contains baseline shipper requirements.
-
-These files are parsed and uploaded to the database during seeding. They are not read at runtime.
-
----
-
-## PART 9 — MACHINE LEARNING DETAILS
-
-Karwaan uses two Random Forest classifiers to predict transportation risks:
-
-### 1. Spoilage Prediction Model (`spoilage_rf_model.pkl`)
-*   **Features**: `product_type`, `required_min_temp_c`, `required_max_temp_c`, `observed_avg_temp`, `observed_max_temp`, `observed_min_temp`, `temperature_excursion_minutes`, `observed_excursion_count`, `base_transit_hr`, `delay_minutes`, `transfer_count`, `weight_kg`.
-*   **Target**: `spoiled_synthetic` (Boolean).
-*   **Algorithm**: `RandomForestClassifier` (100 estimators, max depth 10).
-
-### 2. Delay Prediction Model (`delay_rf_model.pkl`)
-*   **Features**: `product_type`, `weight_kg`, `transport_mode`, `base_transit_hr`, `required_min_temp_c`, `required_max_temp_c`, `pickup_hour`, `delivery_deadline_hr`, `transfer_count`, `rain_flag`, `congestion_index`, `historical_route_reliability`, `route_reliability_feature`.
-*   **Target**: `delayed` (Boolean).
-
----
-
-## PART 10 — RETRAINING THE ML MODELS
-
-To retrain both classifiers from scratch, run the following commands:
-
-```bash
-# 1. Navigate to backend models directory
+**ML Setup (Terminal 3 - Optional if models already exist):**
+```powershell
 cd backend/models
-
-# 2. Activate Python Virtual Environment
-venv\Scripts\activate
-
-# 3. Run retraining scripts (will overwrite pkl files)
+pip install pandas numpy scikit-learn joblib
 python train_delay_model.py
 python train_spoilage_model.py
 ```
+*(This generates `delay_rf_model.pkl` and `spoilage_rf_model.pkl` required for ML predictions)*
+
+**Demo Login:**
+Open the frontend URL. Click "Login".
+- **Admin**: `admin@karwaan.in`
+- **Business**: `logistics@sahyadri.in`
+- (Password is standard/mocked by the backend for all demo users, e.g., anything or default if bypassed by frontend).
 
 ---
 
-## PART 11 — CONSOLIDATION & OPTIMIZATION LOGIC
+## PART 1 & 2: COMPLETE SYSTEM ARCHITECTURE & PROJECT STRUCTURE
 
-### Consolidation Matching
-Shipments are eligible for grouping if they share an origin/destination and meet compatibility constraints:
-```typescript
-const tempCompatible = candidate.targetTempMin >= targetMin - 2 && candidate.targetTempMax <= targetMax + 2;
-const locCompatible = candidate.origin === baseOrigin && candidate.destination === baseDest;
-const fitsCapacity = currentWeight + candWeight <= maxGlobalCapacity;
+Karwaan is split into a React (Vite) Frontend and a Node.js (Express) Backend. Machine learning is integrated via Python scripts called by the Node.js backend using subprocess execution. Data is stored in PostgreSQL via Drizzle ORM.
+
+### Actual Folder Structure
+```
+root/
+├── frontend/
+│   ├── package.json
+│   ├── vite.config.ts
+│   ├── src/
+│   │   ├── App.tsx             (Main routing)
+│   │   ├── lib/apiClient.ts    (Fetch wrapper with Auth)
+│   │   ├── pages/              (RoleSelection, Login, Business, Agent)
+│   │   └── pages/admin/        (Admin dashboards)
+├── backend/
+│   ├── package.json
+│   ├── server.ts               (Express entry point)
+│   ├── db/
+│   │   ├── schema.ts           (Drizzle table definitions)
+│   │   └── seed.ts             (CSV parsing and database seeder)
+│   ├── routes/                 (Express API routing definitions)
+│   ├── controllers/            (API logic and service delegation)
+│   ├── services/
+│   │   ├── consolidationEngine.ts (Core grouping and routing logic)
+│   │   └── riskPrediction.ts      (Python subprocess caller & physics heuristic)
+│   └── models/
+│       ├── train_delay_model.py
+│       ├── train_spoilage_model.py
+│       ├── predict_delay.py
+│       └── predict_spoilage.py
+└── *.csv                       (Raw cleaned datasets used by db/seed.ts)
 ```
 
-### Multi-Objective Objective Function
-Alternative candidate plans are evaluated and scored using a weighted utility function:
-$$\text{Score} = (\bar{C} \times W_{\text{cost}}) + (\bar{D} \times W_{\text{delay}}) + (\bar{S} \times W_{\text{spoilage}}) + (\bar{T} \times W_{\text{transfers}})$$
-
-Where:
-*   $\bar{C}$ = Normalized Cost
-*   $\bar{D}$ = Predicted Delay Probability (from ML model)
-*   $\bar{S}$ = Predicted Spoilage Probability (from ML model)
-*   $\bar{T}$ = Transfer penalty (0.1 per transfer point)
-
-Weights are dynamically adjusted at runtime based on the user's preference (`lowest_cost`, `fastest`, or `safest`).
+**Architecture Flow:**
+```
+USER
+  ↓
+FRONTEND (React/Vite)
+  ↓
+API CLIENT (fetch)
+  ↓
+BACKEND (Express/Node.js) -> PYTHON SUBPROCESS (Scikit-Learn inference)
+  ↓
+SERVICES (Consolidation Engine, Risk Prediction)
+  ↓
+DATABASE (PostgreSQL via Drizzle ORM)
+```
 
 ---
 
-## PART 12 — TROUBLESHOOTING
+## PART 3: WHAT IS KARWAAN?
 
-| Symptom | Probable Cause | Action |
-| :--- | :--- | :--- |
-| **Model loading fails** | Missing Python virtual environment dependencies. | Run `pip install pandas numpy scikit-learn joblib` in `backend/models`. |
-| **DB connection fails** | Invalid database URI configuration in `.env`. | Verify that the `DATABASE_URL` matches your PostgreSQL connection string. |
-| **No feasible plan returned** | The shipment SLA window is shorter than the transit time. | The system returns a fallback road route and appends a warning banner to the explanation. |
+Karwaan solves the real-world logistics problem of fragmented, sub-optimal perishable goods transport (SOAIDEATHON-S17). 
+MSMEs (Micro, Small & Medium Enterprises) often cannot afford dedicated refrigerated trucks. Karwaan pools their shipments together (Consolidation), selects the most optimal multimodal transport routes, and predicts delay and spoilage risks using AI.
+
+- **MSMEs / Businesses** use Karwaan to submit shipments and get optimal route recommendations.
+- **Admins / Operations** use Karwaan to monitor the entire network, view incidents, and manage the fleet.
+- **Why AI?** To predict non-obvious risks (delays based on weather/traffic features, and spoilage based on thermal physics and past excursions).
+- **Why Explainability?** Logistics managers won't trust an AI blindly. Karwaan explains *why* a route was chosen (e.g. "Multimodal rail achieved the lowest combined risk/cost score").
+
+---
+
+## PART 5: FRONTEND DOCUMENTATION
+
+The frontend uses standard React Router (`src/App.tsx`).
+
+### Core Pages
+- **Landing Page** (`/`): `LandingPage.tsx`. Marketing and entry point.
+- **Role Selection** (`/select-role`): `RoleSelectionPage.tsx`. User chooses Admin, Business, or Agent.
+- **Login** (`/login/:role`): `LoginPage.tsx`. Authenticates and redirects.
+- **Business Dashboard** (`/business`): `BusinessDashboard.tsx`. MSME view. Shows their active shipments, allows creating new shipments, viewing consolidation recommendations, and confirming plans.
+- **Admin Dashboard** (`/admin`): `AdminDashboard.tsx`. Network overview.
+- **Admin Sub-pages**: `/admin/shipments`, `/admin/clusters`, `/admin/routes`, `/admin/incidents`, `/admin/map`. Dedicated pages for operations managers.
+
+---
+
+## PART 6 & 7: USER JOURNEYS
+
+### MSME User Journey
+1. **Login**: Business user logs in.
+2. **Dashboard**: Sees active shipments fetched via `apiClient.get('/shipments')`.
+3. **Recommendation**: User clicks to see AI recommendations for a shipment.
+4. **Backend Flow**: `recommendationsController.ts` calls `consolidationEngine.ts`. The engine matches the shipment with others (based on location/temp), generates routes (Road, Multimodal, Express), scores them by calling `riskPrediction.ts` (which spawns Python), and returns the ranked list.
+5. **Selection**: User reviews the explanation and selects a route.
+
+### Admin User Journey
+1. **Login**: Admin logs in.
+2. **Admin Dashboard**: Fetches network aggregates.
+3. **Map**: `AdminMap.tsx` displays live vehicle positions and hubs (simulated based on DB data).
+4. **Incidents**: `AdminIncidents.tsx` shows active alerts (e.g., temperature excursions) and allows managing them.
+
+---
+
+## PART 8: DATABASE COMPLETE REFERENCE
+
+Managed by Drizzle ORM in `backend/db/schema.ts`.
+
+- **users**: Stores authentication info. PK `id` (varchar).
+- **businesses**: Represents MSMEs. PK `id`.
+- **shipments**: Core cargo records. PK `id`. Tracks `cargo_type`, `targetTempMin/Max`, `weightKg`, `slaMaxDeliveryHours`. FK `business_id`.
+- **hubs**: Physical cross-docking/rail terminals. Tracks `latitude`, `longitude`, `railAccess`.
+- **vehicles**: Fleet information. Tracks `capacityKg`, `costPerKmInr`.
+- **consolidation_clusters**: Groupings of compatible shipments.
+- **cluster_shipments**: Many-to-many join table for clusters and shipments.
+- **delivery_routes**: Physical transit plans assigned to clusters.
+- **route_legs**: The segments (road -> rail -> road) of a route.
+- **incident_reports**: Disruptions linked to shipments.
+- **temperature_log_entries**: Time-series telemetry logs.
+
+*Relationships are direct and defined strictly via Drizzle foreign keys.*
+
+---
+
+## PART 9 & 10: CSV DATA & INGESTION
+
+### CSV Datasets (Located in root)
+- `vehicles_clean.csv`: Base fleet.
+- `routes_clean.csv`: Historical/known physical routes.
+- `hubs_clean.csv`: Warehouse locations.
+- `current_shipments_clean.csv`: Live operational shipments.
+- `historical_shipments_clean.csv`: Past data used for training.
+- `temperature_history_clean.csv`: Telemetry for historical shipments.
+
+### Seeding Process (`backend/db/seed.ts`)
+Run via `npm run seed`. 
+The script reads the CSVs directly from the root directory using `csv-parse/sync`.
+It is **idempotent** because it uses `onConflictDoNothing()` for batch inserts.
+The script inserts hardcoded default users and businesses, then parses the CSVs to populate hubs, vehicles, routes, route_legs, vehicle_availability, and shipments.
+*Important:* Data is copied into PostgreSQL. The application reads from Postgres at runtime, NOT from the CSVs.
+
+---
+
+## PART 11, 12, 13: MACHINE LEARNING REFERENCE
+
+### 1. Delay Risk Model
+- **Algorithm**: Random Forest Classifier (`sklearn.ensemble.RandomForestClassifier`)
+- **Training Script**: `backend/models/train_delay_model.py`
+- **Data Source**: `delay_training_ready.csv` (derived from historical shipments).
+- **Features**: `product_type`, `transport_mode`, `weight_kg`, `base_transit_hr`, `required_min_temp_c`, etc.
+- **Target**: `delayed` (boolean).
+- **Artifact**: `delay_rf_model.pkl`
+
+### 2. Spoilage Risk Model
+- **Algorithm**: Random Forest Classifier
+- **Training Script**: `backend/models/train_spoilage_model.py`
+- **Data Source**: Synthetically generated during training (`historical_shipments_clean.csv` joined with `temperature_shipment_aggregates_AUDIT_ONLY.csv`).
+- **Features**: `temperature_excursion_minutes`, `observed_max_temp`, `delay_minutes`, `transfer_count`, etc.
+- **Target**: `spoiled_synthetic` (probabilistically generated based on physics heuristics).
+- **Artifact**: `spoilage_rf_model.pkl`
+
+### Retraining
+To retrain from scratch:
+1. Replace root CSVs.
+2. `cd backend/models`
+3. `python train_delay_model.py`
+4. `python train_spoilage_model.py`
+The `.pkl` files will be overwritten. Restart the backend to ensure no caching issues, though the subprocess loads the pickle file fresh on every request.
+
+---
+
+## PART 14 & 15: CONSOLIDATION & OPTIMIZATION ENGINE
+
+Located in `backend/services/consolidationEngine.ts`.
+
+**Algorithm Behavior:**
+1. **Selection**: Iterates over unassigned shipments.
+2. **Compatibility**: Checks if origin and destination are within a 50km radius (using an internal Haversine distance function with a 1.18 circuity factor).
+3. **Temperature Rules**: Groups shipments if their required temperature bands overlap (±2°C).
+4. **Capacity**: Ensures sum of `weightKg` does not exceed global vehicle maximum.
+5. **Route Generation**: Generates 3 candidates:
+   - *Direct Road*: Simple, reliable, standard cost.
+   - *Multimodal*: Generated if distance > 200km and hubs have `railAccess`. Adds 2 transfers. High base cost but cheaper per km.
+   - *Express*: Premium road transport for SLAs.
+6. **Scoring / Optimization**: Computes a weighted score based on:
+   `Cost (30%) + Duration (30%) + Delay Risk (20%) + Spoilage Risk (15%) + Transfers (5%)`.
+   (Weights change dynamically if the user requests 'fastest' or 'lowest_cost').
+7. The plan with the lowest score wins.
+
+---
+
+## PART 16 & 18: RISK PREDICTION & EXPLAINABILITY
+
+Located in `backend/services/riskPrediction.ts`.
+
+**Delay Risk**: Submits features to `predict_delay.py`. If python fails, falls back to a rule-based 30% heuristic.
+**Spoilage Risk**: Combines an Arrhenius physics baseline (calculating kinetic shelf life lost based on Q10=2.5) with the ML risk probability from `predict_spoilage.py`.
+
+**Explainability**:
+The consolidation engine generates human-readable text based on the math.
+For example, if multimodal wins: `"Multimodal rail achieved the lowest combined risk/cost score for this {distance}km corridor, offsetting intermediate transfer penalties."`
+
+---
+
+## PART 19 & 20: API REFERENCE
+
+**Base URL**: `/api`
+
+| Endpoint | Method | Purpose | Controller/Service |
+|----------|--------|---------|--------------------|
+| `/auth/login` | POST | Authenticates user | `authController.ts` |
+| `/shipments` | GET | List user's shipments | `shipmentsController.ts` |
+| `/shipments` | POST | Create shipment | `shipmentsController.ts` |
+| `/recommendations/grouping` | GET/POST | Get consolidation clusters | `consolidationEngine.ts` |
+| `/recommendations/route` | POST | Get route for cluster | `consolidationEngine.ts` |
+| `/recommendations/plan` | POST | Unified engine output | `consolidationEngine.ts` |
+| `/clusters` | GET | List clusters | `clustersController.ts` |
+| `/incidents` | GET | List disruptions | `incidentsController.ts` |
+
+**Connection Map Example:**
+`BusinessDashboard.tsx` -> `apiClient.post('/recommendations/route')` -> `routes/recommendations.ts` -> `recommendationsController.recommendRoute` -> `consolidationEngine.recommendRoute` -> `riskPredictionService` -> `predict_delay.py` (Subprocess) -> Returns JSON to Frontend.
+
+---
+
+## PART 21: ENVIRONMENT VARIABLES
+
+**Backend (`backend/.env`)**
+- `DATABASE_URL`: Connection string for Postgres (Neon). (REQUIRED)
+- `PORT`: (Optional) Default is 3001.
+
+**Frontend (`frontend/.env`)**
+- None strictly required. `apiClient.ts` hardcodes `http://localhost:3001/api`.
+
+---
+
+## PART 27: TROUBLESHOOTING
+
+| Issue | Possible Cause | Fix |
+|-------|---------------|-----|
+| Frontend won't start / UI blank | Vite port conflict | Ensure port 3000/5173 is free. |
+| Backend won't start | Missing `.env` | Create `.env` and set `DATABASE_URL`. |
+| Database migration fails | Drizzle config error | Run `npm run db:generate` before `push`. |
+| Seed script fails | CSV paths | Ensure terminal is inside the `backend/` folder when running `npm run seed`. |
+| Recommendations return 500 | Python not installed / ML missing | Ensure Python 3 is in PATH. Run training scripts to generate `.pkl` files. |
+| Models predict 'medium' always | Python subprocess failed | The engine is falling back to heuristics. Check backend terminal for Python traceback logs. |
+
+---
+
+## PART 28: COMMON DEVELOPMENT TASKS
+
+- **Change DB Schema**: Edit `backend/db/schema.ts`, then run `npm run db:generate` and `npm run db:push`.
+- **Change Optimization Weights**: Edit `DEFAULT_SCORE_WEIGHTS` in `backend/services/consolidationEngine.ts`.
+- **Replace CSVs**: Overwrite files in the root directory, then run `npm run seed` inside `backend/`.
+
+---
+
+## PART 29 & 30: SECURITY & LIMITATIONS
+
+**Security:**
+Implemented simple JWT/Bcrypt authentication (`authController.ts`). 
+*Not production grade.* Role-based access is present, but missing strict tenant isolation in all queries.
+
+**Current Limitations / Simulations:**
+- **Simulated Maps**: GPS coordinates and hubs map to hardcoded `KNOWN_COORDINATES` in `consolidationEngine.ts` to ensure Indian geography renders correctly.
+- **Simulated Live Tracking**: Temperature logs are historical or mocked at runtime; there is no real IoT webhook currently ingesting data.
+- **Python Subprocess**: Spawning Python for every API request is highly inefficient and not production-ready. A dedicated FastAPI/Flask inference server should be built for production.
+
+---
+
+## PART 31: JUDGE REQUIREMENT TRACEABILITY
+
+| SOAIDEATHON REQUIREMENT | KARWAAN IMPLEMENTATION | STATUS |
+|-------------------------|------------------------|--------|
+| Shipment consolidation | `consolidationEngine.ts` grouping logic | IMPLEMENTED |
+| Road/Rail/Local | `route_legs` and multimodal candidate generation | IMPLEMENTED |
+| Spoilage prediction | `predict_spoilage.py` + Arrhenius physics | IMPLEMENTED |
+| Delay prediction | `predict_delay.py` | IMPLEMENTED |
+| Capacity/SLA | Checked during grouping and scoring | IMPLEMENTED |
+| Explainability | Human-readable reasoning strings attached to plans | IMPLEMENTED |
+
+---
+*Generated based on actual source code state.*
