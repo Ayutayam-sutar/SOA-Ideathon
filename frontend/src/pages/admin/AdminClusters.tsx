@@ -9,7 +9,6 @@ import {
   Shipment,
   ConsolidationCluster,
 } from "../../types";
-import { consolidationEngine } from "../../services/consolidationEngine";
 import { useAuth } from "../../contexts/AuthContext";
 
 
@@ -49,7 +48,7 @@ export const AdminClusters: React.FC = () => {
       const generate = async () => {
         setIsGenerating(true);
         try {
-          const recs = consolidationEngine.recommendGrouping(shipments);
+          const recs = await dataService.recommendGrouping();
           setRecommendedClusters(recs);
 
           const details: Record<string, any> = {};

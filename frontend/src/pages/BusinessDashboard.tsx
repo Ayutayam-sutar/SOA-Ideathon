@@ -26,46 +26,122 @@ import {
   ChevronRight
 } from 'lucide-react';
 
+const LOCATION_COORDS: Record<string, [number, number]> = {
+  // Odisha Hubs & Terminals
+  'bhubaneswar wholesale terminal': [20.2961, 85.8245],
+  'bhubaneswar': [20.2961, 85.8245],
+  'cuttack agro-packhouse': [20.4625, 85.8830],
+  'cuttack': [20.4625, 85.8830],
+  'omfed square': [20.2961, 85.8245],
+  'puri': [19.8135, 85.8312],
+  'jajpur': [20.8444, 86.3364],
+  'jajpur road': [20.8444, 86.3364],
+  'bhadrak': [21.0544, 86.4955],
+  'baleswar': [21.4934, 86.9135],
+  'balasore': [21.4934, 86.9135],
+  'baripada': [21.9346, 86.7324],
+  'rourkela': [22.2604, 84.8536],
+  'koraput': [18.8140, 82.7126],
+  'malkangiri': [18.3436, 81.8845],
+  'balangir': [20.7107, 83.4866],
+  'berhampur': [19.3149, 84.7941],
+  'gopalpur': [19.2611, 84.9099],
+  'sambalpur': [21.4685, 83.9782],
+  'angul': [20.8400, 85.1500],
+  'jharsuguda': [21.8554, 84.0062],
+  'dhenkanal': [20.6582, 85.5985],
+  'kendrapara': [20.5008, 86.4230],
+  'jagatsinghpur': [20.2676, 86.1685],
+  'bargarh': [21.3341, 83.6214],
+  'keonjhar': [21.6289, 85.5817],
+  'rayagada': [19.1678, 83.4163],
+
+  // Northern & NCR Hubs
+  'delhi': [28.6139, 77.2090],
+  'new delhi': [28.6139, 77.2090],
+  'delhi ncr': [28.6139, 77.2090],
+  'delhi ncr logistics hub': [28.6139, 77.2090],
+  'haryana': [29.0588, 76.0856],
+  'harayana': [29.0588, 76.0856],
+  'gurugram': [28.4595, 77.0266],
+  'gurgaon': [28.4595, 77.0266],
+  'faridabad': [28.4089, 77.3178],
+  'panipat': [29.3909, 76.9635],
+  'sonipat': [28.9931, 77.0151],
+  'chandigarh': [30.7333, 76.7794],
+  'ludhiana': [30.9010, 75.8573],
+  'amritsar': [31.6340, 74.8723],
+  'jaipur': [26.9124, 75.7873],
+  'lucknow': [26.8467, 80.9462],
+  'kanpur': [26.4542, 80.3503],
+  'kanpur central': [26.4542, 80.3503],
+  'prayagraj': [25.4484, 81.8284],
+  'varanasi': [25.3176, 82.9739],
+
+  // Eastern & Central Hubs
+  'kolkata': [22.5726, 88.3639],
+  'kolkata wholesale hub': [22.5726, 88.3639],
+  'hijli': [22.3168, 87.3183],
+  'tatanagar': [22.7758, 86.2036],
+  'tatanagar junction': [22.7758, 86.2036],
+  'jamshedpur': [22.8046, 86.2029],
+  'ranchi': [23.3441, 85.3096],
+  'dhanbad': [23.7957, 86.4304],
+  'patna': [25.6093, 85.1376],
+  'raipur': [21.2514, 81.6296],
+  'nagpur': [21.1458, 79.0882],
+
+  // Southern & Western Hubs
+  'vizag': [17.6868, 83.2185],
+  'visakhapatnam': [17.6868, 83.2185],
+  'hyderabad': [17.3850, 78.4867],
+  'bengaluru': [12.9716, 77.5946],
+  'bangalore': [12.9716, 77.5946],
+  'chennai': [13.0827, 80.2707],
+  'mumbai': [19.0760, 72.8777],
+  'vashi apmc': [19.0759, 72.9984],
+  'pune': [18.5204, 73.8567],
+  'nashik': [20.0988, 73.9189],
+  'ahmedabad': [23.0225, 72.5714],
+  'surat': [21.1702, 72.8311],
+  'indore': [22.7196, 75.8577],
+  'satara': [17.6805, 74.0183],
+  'ratnagiri': [16.9902, 73.3120],
+};
+
 const getEstimateDistance = (origin: string, dest: string): number => {
-  const coords: Record<string, [number, number]> = {
-    'delhi': [28.6139, 77.2090],
-    'haryana': [29.0588, 76.0856],
-    'gopalpur': [19.2611, 84.9099],
-    'bhubaneswar': [20.2961, 85.8245],
-    'cuttack': [20.4625, 85.8830],
-    'kolkata': [22.5726, 88.3639],
-    'mumbai': [19.0760, 72.8777],
-    'pune': [18.5204, 73.8567],
-    'hyderabad': [17.3850, 78.4867],
-    'bengaluru': [12.9716, 77.5946],
-    'chennai': [13.0827, 80.2707],
-    'raipur': [21.2514, 81.6296],
-    'nagpur': [21.1458, 79.0882],
-    'vizag': [17.6868, 83.2185],
-    'puri': [19.8135, 85.8312],
-    'rourkela': [22.2604, 84.8536],
-    'berhampur': [19.3149, 84.7941],
-    'sambalpur': [21.4685, 83.9782],
-    'jaipur': [26.9124, 75.7873],
-    'lucknow': [26.8467, 80.9462],
-  };
   const getC = (n: string): [number, number] => {
     const k = (n || '').toLowerCase().trim();
-    for (const [key, c] of Object.entries(coords)) {
-      if (k.includes(key) || key.includes(k)) return c;
+    if (!k) return [20.2961, 85.8245];
+    for (const [key, c] of Object.entries(LOCATION_COORDS)) {
+      if (k === key || k.includes(key) || key.includes(k)) return c;
     }
-    return [20.2961, 85.8245];
+    // Deterministic fallback for unlisted locations
+    let hash = 0;
+    for (let i = 0; i < k.length; i++) {
+      hash = (hash << 5) - hash + k.charCodeAt(i);
+      hash |= 0;
+    }
+    const latOffset = ((Math.abs(hash) % 1000) / 1000) * 8 - 4;
+    const lngOffset = ((Math.abs(hash >> 3) % 1000) / 1000) * 8 - 4;
+    return [21.0 + latOffset, 84.0 + lngOffset];
   };
+
   const c1 = getC(origin);
   const c2 = getC(dest);
   const R = 6371;
-  const dLat = (c2[0] - c1[0]) * Math.PI / 180;
-  const dLon = (c2[1] - c1[1]) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(c1[0] * Math.PI / 180) * Math.cos(c2[0] * Math.PI / 180) *
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return Math.max(35, Math.round(R * c));
+  const dLat = ((c2[0] - c1[0]) * Math.PI) / 180;
+  const dLon = ((c2[1] - c1[1]) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((c1[0] * Math.PI) / 180) *
+      Math.cos((c2[0] * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const straightLineKm = R * c;
+  // Route network circuity factor 1.18 for realistic highway road / rail distance
+  return Math.max(15, Math.round(straightLineKm * 1.18));
 };
 
 const EngineProcessingView: React.FC<{
@@ -101,12 +177,12 @@ const EngineProcessingView: React.FC<{
 
   return (
     <div className="p-6 sm:p-8 flex flex-col items-center justify-center text-center bg-[#F8FAF7] space-y-5">
-      {/* Route & Distance Badge */}
-      <div className="flex flex-wrap items-center justify-center gap-2 bg-[#163832] text-white px-4 py-2 rounded-full text-xs font-mono shadow-md border border-[#245249]">
-        <span className="text-emerald-300 font-bold">📍 {origin || 'Origin'}</span>
-        <span className="text-white/50">➔</span>
-        <span className="text-amber-300 font-bold">🏁 {destination || 'Destination'}</span>
-        <span className="bg-white/10 px-2.5 py-0.5 rounded text-[11px] text-emerald-200 font-bold ml-1">
+      {/* Route & Distance Badge - Light Theme */}
+      <div className="flex flex-wrap items-center justify-center gap-2 bg-[#FFFFFF] text-[#163832] px-4 py-2 rounded-full text-xs font-mono shadow-sm border border-[#D6DCD4]">
+        <span className="text-[#163832] font-bold">📍 {origin || 'Origin'}</span>
+        <span className="text-[#596560]">➔</span>
+        <span className="text-[#9A6218] font-bold">🏁 {destination || 'Destination'}</span>
+        <span className="bg-[#EAF3E7] px-2.5 py-0.5 rounded text-[11px] text-[#2D6A4F] font-bold ml-1 border border-[#C5DEC0]">
           📏 Total Distance: {dist} km
         </span>
       </div>
@@ -122,17 +198,17 @@ const EngineProcessingView: React.FC<{
         </p>
       </div>
 
-      {/* Terminal Calculation Console */}
-      <div className="w-full max-w-xl bg-[#0B1A17] border border-[#163832] rounded-xl p-4 sm:p-5 text-left font-mono text-[11px] sm:text-xs shadow-2xl space-y-2.5 overflow-hidden">
-        <div className="flex items-center justify-between border-b border-[#1D4A42] pb-2 text-[10px] text-white/50 uppercase tracking-widest">
+      {/* Terminal Calculation Console - Light Theme */}
+      <div className="w-full max-w-xl bg-[#FFFFFF] border border-[#D6DCD4] rounded-xl p-4 sm:p-5 text-left font-mono text-[11px] sm:text-xs shadow-sm space-y-2.5 overflow-hidden">
+        <div className="flex items-center justify-between border-b border-[#E5EBE3] pb-2 text-[10px] text-[#596560] uppercase tracking-widest">
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block"></span>
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block"></span>
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
-            <span className="ml-2 text-white/80 font-bold">Engine Calculation Telemetry</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#E57373] inline-block"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#FFB74D] inline-block"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#81C784] inline-block"></span>
+            <span className="ml-2 text-[#163832] font-bold">Engine Calculation Telemetry</span>
           </div>
-          <span className="text-emerald-400 font-bold flex items-center gap-1 animate-pulse">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> COMPUTING
+          <span className="text-[#2D6A4F] font-bold flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-[#2D6A4F] animate-pulse"></span> COMPUTING
           </span>
         </div>
 
@@ -142,37 +218,37 @@ const EngineProcessingView: React.FC<{
               key={idx} 
               className={`leading-relaxed animate-in fade-in slide-in-from-left-2 duration-200 ${
                 log.type === 'header' 
-                  ? 'text-[#D98E2B] font-bold border-b border-white/5 pb-1' 
+                  ? 'text-[#9A6218] font-bold border-b border-[#E5EBE3] pb-1' 
                   : log.type === 'multimodal'
-                  ? 'text-emerald-300 font-bold bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/20'
+                  ? 'text-[#163832] font-bold bg-[#EBF4E9] px-2.5 py-1 rounded border border-[#C5DEC0]' 
                   : log.type === 'success'
-                  ? 'text-emerald-400 font-bold pt-1'
-                  : 'text-gray-300'
+                  ? 'text-[#2D6A4F] font-bold pt-1 flex items-center gap-1'
+                  : 'text-[#2F3E37]'
               }`}
             >
               {log.text}
             </div>
           ))}
           {activeStep < terminalLogs.length - 1 && (
-            <div className="text-emerald-400/70 text-[10px] animate-pulse flex items-center gap-1 pt-1">
-              <span>&gt; Evaluating candidate constraints...</span>
-              <span className="inline-block w-2 h-3.5 bg-emerald-400"></span>
+            <div className="text-[#2D6A4F] text-[10px] flex items-center gap-1 pt-1">
+              <span className="animate-pulse">&gt; Evaluating candidate constraints...</span>
+              <span className="inline-block w-1.5 h-3 bg-[#2D6A4F] animate-ping"></span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Real-time Calculation Matrix */}
+      {/* Real-time Calculation Matrix - Light Theme */}
       <div className="grid grid-cols-3 gap-2 w-full max-w-xl text-[11px] font-mono">
         <div className="bg-white border border-[#E5EBE3] p-2.5 rounded-lg shadow-sm text-left">
           <span className="block text-[10px] text-[#596560] uppercase">Direct Road</span>
           <span className="font-bold text-[#163832]">₹{roadCost.toLocaleString()}</span>
           <span className="block text-[10px] text-[#89938E]">{roadDur} hrs</span>
         </div>
-        <div className="bg-emerald-50 border border-emerald-300 p-2.5 rounded-lg shadow-sm text-left">
-          <span className="block text-[10px] text-emerald-800 uppercase font-bold">Multimodal Rail</span>
-          <span className="font-bold text-emerald-700">₹{multiCost.toLocaleString()}</span>
-          <span className="block text-[10px] text-emerald-600 font-semibold">{multiDur} hrs</span>
+        <div className="bg-[#EAF3E7] border-2 border-[#5C7A50] p-2.5 rounded-lg shadow-sm text-left">
+          <span className="block text-[10px] text-[#163832] uppercase font-bold">Multimodal Rail</span>
+          <span className="font-bold text-[#2D6A4F]">₹{multiCost.toLocaleString()}</span>
+          <span className="block text-[10px] text-[#2D6A4F] font-semibold">{multiDur} hrs</span>
         </div>
         <div className="bg-white border border-[#E5EBE3] p-2.5 rounded-lg shadow-sm text-left">
           <span className="block text-[10px] text-[#596560] uppercase">Fast Express</span>
@@ -209,6 +285,7 @@ export const BusinessDashboard: React.FC = () => {
   const [whatIfSla, setWhatIfSla] = useState<string>('');
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [isCategoryDirty, setIsCategoryDirty] = useState(false);
 
   const [newCargo, setNewCargo] = useState({
     cargoType: '',
@@ -216,6 +293,7 @@ export const BusinessDashboard: React.FC = () => {
     weightKg: '' as string | number,
     volumeCbm: 2.0,
     totalShelfLifeDays: '' as string | number,
+    slaMaxDeliveryHours: '' as string | number,
     slaMaxSpoilagePercent: '' as string | number,
     slaPriority: 'normal',
     originName: '',
@@ -235,6 +313,19 @@ export const BusinessDashboard: React.FC = () => {
   const [notification, setNotification] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isCategoryDirty && newCargo.cargoType) {
+      const text = newCargo.cargoType.toLowerCase();
+      if (text.includes('mango')) setNewCargo(p => ({ ...p, category: 'mangoes' }));
+      else if (text.includes('berry') || text.includes('strawber')) setNewCargo(p => ({ ...p, category: 'berries' }));
+      else if (text.includes('grape')) setNewCargo(p => ({ ...p, category: 'grapes' }));
+      else if (text.includes('leaf') || text.includes('spinach')) setNewCargo(p => ({ ...p, category: 'leafy_greens' }));
+      else if (text.includes('tomato')) setNewCargo(p => ({ ...p, category: 'tomatoes' }));
+      else if (text.includes('milk') || text.includes('cheese') || text.includes('dairy')) setNewCargo(p => ({ ...p, category: 'dairy' }));
+      else if (text.includes('mushroom')) setNewCargo(p => ({ ...p, category: 'mushrooms' }));
+    }
+  }, [newCargo.cargoType, isCategoryDirty]);
 
   // Load data function to be reused for demo reset
   const loadData = async () => {
@@ -310,7 +401,7 @@ export const BusinessDashboard: React.FC = () => {
         targetTempMin: Number(newCargo.targetTempMin),
         targetTempMax: Number(newCargo.targetTempMax),
         totalShelfLifeHours: Number(newCargo.totalShelfLifeDays) * 24,
-        slaMaxDeliveryHours: 48,
+        slaMaxDeliveryHours: newCargo.slaMaxDeliveryHours ? Number(newCargo.slaMaxDeliveryHours) : 48,
         slaMaxSpoilagePercent: Number(newCargo.slaMaxSpoilagePercent),
         slaPriority: newCargo.slaPriority || 'normal',
         deliveryDeadline: computedDeadline,
@@ -369,7 +460,7 @@ export const BusinessDashboard: React.FC = () => {
     setSelectedPlanType('recommended');
     setNewCargo({
       cargoType: '', category: 'berries', weightKg: '', volumeCbm: 2.0,
-      totalShelfLifeDays: '', slaMaxSpoilagePercent: '', slaPriority: 'normal',
+      totalShelfLifeDays: '', slaMaxDeliveryHours: '', slaMaxSpoilagePercent: '', slaPriority: 'normal',
       originName: '', originLat: 20.4625, originLng: 85.8830, originAddress: '',
       destinationName: '', destinationLat: 20.2961, destinationLng: 85.8245, destinationAddress: '',
       targetTempMin: '', targetTempMax: '', deliveryDeadline: '', notes: '',
@@ -489,7 +580,7 @@ export const BusinessDashboard: React.FC = () => {
           <div className="bg-white border border-[#E5EBE3] rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-24 h-24 bg-green-50 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
             <div className="flex items-center justify-between text-xs font-mono text-[#596560] font-bold tracking-widest uppercase mb-3">
-              <span>Total Freight Savings</span>
+              <span>Estimated Freight Savings</span>
               <div className="bg-green-100 p-2 rounded-lg"><TrendingDown className="w-5 h-5 text-green-700" /></div>
             </div>
             <div className="font-display font-black text-3xl text-[#163832]">₹{totalCostSaved.toLocaleString()}</div>
@@ -501,7 +592,7 @@ export const BusinessDashboard: React.FC = () => {
           <div className="bg-white border border-[#E5EBE3] rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
             <div className="flex items-center justify-between text-xs font-mono text-[#596560] font-bold tracking-widest uppercase mb-3">
-              <span>Carbon Reduction</span>
+              <span>Estimated Carbon Reduction</span>
               <div className="bg-emerald-100 p-2 rounded-lg"><Leaf className="w-5 h-5 text-emerald-700" /></div>
             </div>
             <div className="font-display font-black text-3xl text-[#163832]">{totalCO2Saved.toFixed(1)} <span className="text-xl text-[#596560]">kg CO₂</span></div>
@@ -630,7 +721,7 @@ export const BusinessDashboard: React.FC = () => {
                   {/* Top Dark Header */}
                   <div className="p-6 text-white">
                     <div className="flex items-center justify-between mb-4">
-                      <span className="font-mono text-[10px] font-bold text-[#D98E2B] uppercase tracking-widest bg-[#D98E2B]/10 px-2 py-1 rounded">Live Telemetry</span>
+                      <span className="font-mono text-[10px] font-bold text-[#D98E2B] uppercase tracking-widest bg-[#D98E2B]/10 px-2 py-1 rounded">Cold-Chain Status</span>
                     </div>
                     <h3 className="font-display font-black text-2xl mb-1">{selectedShipment.code}</h3>
                     <p className="text-white/70 text-sm font-medium">{selectedShipment.cargoType}</p>
@@ -762,7 +853,7 @@ export const BusinessDashboard: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1.5">Produce Category</label>
-                    <select value={newCargo.category} onChange={(e) => setNewCargo({ ...newCargo, category: e.target.value as PerishableCategory })} className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-[#5C7A50]/20 focus:border-[#5C7A50] shadow-sm">
+                    <select value={newCargo.category} onChange={(e) => { setIsCategoryDirty(true); setNewCargo({ ...newCargo, category: e.target.value as PerishableCategory }) }} className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-[#5C7A50]/20 focus:border-[#5C7A50] shadow-sm">
                       <option value="berries">Fresh Berries / Strawberries</option>
                       <option value="mangoes">Alphonso / Tropical Fruits</option>
                       <option value="grapes">Table Grapes / Stone Fruits</option>
@@ -805,7 +896,7 @@ export const BusinessDashboard: React.FC = () => {
               {/* SECTION 3: SLA */}
               <section>
                 <h4 className="font-bold text-[#163832] mb-4 flex items-center gap-2 border-b border-gray-200 pb-2"><ShieldCheck className="w-4 h-4 text-blue-500" /> 3. Service Level Agreement (SLA)</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1.5">Total Shelf Life (Days)</label>
                     <input type="number" required min="1" value={newCargo.totalShelfLifeDays} onChange={(e) => setNewCargo({ ...newCargo, totalShelfLifeDays: e.target.value === '' ? '' : Number(e.target.value) })} className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 font-mono shadow-sm" />
@@ -813,6 +904,12 @@ export const BusinessDashboard: React.FC = () => {
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1.5">Spoilage Integrity Threshold (%)</label>
                     <input type="number" required min="0" max="100" value={newCargo.slaMaxSpoilagePercent} onChange={(e) => setNewCargo({ ...newCargo, slaMaxSpoilagePercent: e.target.value === '' ? '' : Number(e.target.value) })} className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 font-mono shadow-sm" placeholder="Alert if risk exceeds..." />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Max Delivery SLA (Hours)</label>
+                    <input type="number" min="1" value={newCargo.slaMaxDeliveryHours} onChange={(e) => setNewCargo({ ...newCargo, slaMaxDeliveryHours: e.target.value === '' ? '' : Number(e.target.value) })} className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 font-mono shadow-sm" placeholder="e.g. 48 (Defaults to 48 if empty)" />
                   </div>
                 </div>
               </section>
@@ -971,11 +1068,24 @@ export const BusinessDashboard: React.FC = () => {
                   </div>
 
                   <div className="p-6 space-y-6">
+                    {/* Consolidation Details */}
+                    {activePlan?.shipmentCount && (
+                      <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 shadow-sm mb-2">
+                        <h6 className="font-bold text-emerald-800 mb-3 flex items-center gap-2">📦 CONSOLIDATED CLUSTER DETAILS</h6>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-700">
+                          <div>Your Cargo: <span className="font-bold text-gray-900">{newCargo.weightKg || 1000} kg</span></div>
+                          <div>Total Consolidated Load: <span className="font-bold text-gray-900">{activePlan.totalCargoWeight} kg</span></div>
+                          <div>Vehicle Capacity: <span className="font-bold text-gray-900">{activePlan.vehicleMaxCapacity} kg</span></div>
+                          <div>Shipments in Cluster: <span className="font-bold text-gray-900">{activePlan.shipmentCount}</span></div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Risks */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                        <div className="bg-white border border-[#E5EBE3] p-4 rounded-xl shadow-sm">
                          <div className="flex justify-between items-center mb-2">
-                           <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Predictive Delay Risk</span>
+                           <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Predicted Delay Risk</span>
                            <span className="text-xs font-bold text-amber-600">
                              {(activePlan?.delayProbability || activePlan?.delayRisk?.score || 0).toFixed(1)}%
                            </span>
@@ -986,7 +1096,7 @@ export const BusinessDashboard: React.FC = () => {
                        </div>
                        <div className="bg-white border border-[#E5EBE3] p-4 rounded-xl shadow-sm">
                          <div className="flex justify-between items-center mb-2">
-                           <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Spoilage Risk Prob.</span>
+                           <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Predicted Spoilage Risk</span>
                            <span className="text-xs font-bold text-red-600">
                              {(activePlan?.spoilageProbability || activePlan?.spoilageRisk?.score || 0).toFixed(1)}%
                            </span>
@@ -1064,6 +1174,7 @@ export const BusinessDashboard: React.FC = () => {
                                   <td className="py-3 px-4 font-medium text-gray-700 capitalize flex items-center gap-2">
                                     <span className={`w-2.5 h-2.5 rounded-full ${alt.type === 'multimodal' ? 'bg-emerald-600' : alt.type === 'express' ? 'bg-amber-500' : 'bg-blue-500'}`}></span>
                                     {alt.type} Plan ({alt.type === 'multimodal' ? 'Rail + Road' : alt.type === 'express' ? 'Fast Linehaul' : 'Direct Road'})
+                                    {alt.slaStatus === 'violated' && <span className="text-[9px] bg-red-100 text-red-600 font-bold px-1.5 py-0.5 rounded uppercase ml-1">SLA Violated</span>}
                                   </td>
                                   <td className="py-3 px-4 font-mono text-gray-600 text-right">₹{Math.round(alt.cost).toLocaleString()}</td>
                                   <td className="py-3 px-4 text-center font-mono text-xs text-gray-600">{alt.durationHours?.toFixed(1)} hrs</td>

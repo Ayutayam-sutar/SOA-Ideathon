@@ -2,14 +2,14 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { db } from '../db';
-import { users } from '../db/schema';
+import { users, businesses } from '../db/schema';
 import { eq } from 'drizzle-orm';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_hackathon_key';
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, role, businessId } = req.body;
+    const { email, password, role, businessName, contactName } = req.body;
 
     if (!email || !password || !role) {
       return res.status(400).json({ success: false, error: 'Email, password, and role are required' });
@@ -24,6 +24,19 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       return res.status(400).json({ success: false, error: 'Email already registered' });
     }
 
+    let finalBusinessId = null;
+    if (role === 'business') {
+      if (!businessName) {
+        return res.status(400).json({ success: false, error: 'Business name is required' });
+      }
+      finalBusinessId = `BIZ-${Math.floor(Math.random() * 9000) + 1000}`;
+      await db.insert(businesses).values({
+        id: finalBusinessId,
+        name: businessName,
+        contactInfo: contactName || '',
+      });
+    }
+
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
     
@@ -35,7 +48,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       email,
       passwordHash,
       role,
-      businessId: role === 'business' ? businessId : null,
+      businessId: finalBusinessId,
     });
 
     res.status(201).json({ success: true, message: 'User registered successfully' });
@@ -52,12 +65,21 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       return res.status(400).json({ success: false, error: 'Email and password are required' });
     }
 
-    const userArray = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    const userArray = await db
+      .select({
+        user: users,
+        business: businesses,
+      })
+      .from(users)
+      .leftJoin(businesses, eq(users.businessId, businesses.id))
+      .where(eq(users.email, email))
+      .limit(1);
+      
     if (userArray.length === 0) {
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
-    const user = userArray[0];
+    const { user, business } = userArray[0];
 
     // Check role matches requested portal role
     if (role && user.role !== role) {
@@ -100,6 +122,8 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
         email: user.email,
         role: user.role,
         businessId: user.businessId,
+        businessName: business?.name,
+        name: business?.contactInfo,
       },
     });
   } catch (error) {
@@ -116,12 +140,21 @@ export const me = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req as any).user.userId;
     
-    const userArray = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    const userArray = await db
+      .select({
+        user: users,
+        business: businesses,
+      })
+      .from(users)
+      .leftJoin(businesses, eq(users.businessId, businesses.id))
+      .where(eq(users.id, userId))
+      .limit(1);
+
     if (userArray.length === 0) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    const user = userArray[0];
+    const { user, business } = userArray[0];
     res.status(200).json({
       success: true,
       user: {
@@ -129,6 +162,8 @@ export const me = async (req: Request, res: Response, next: NextFunction) => {
         email: user.email,
         role: user.role,
         businessId: user.businessId,
+        businessName: business?.name,
+        name: business?.contactInfo,
       }
     });
   } catch (error) {

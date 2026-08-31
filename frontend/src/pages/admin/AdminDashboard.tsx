@@ -268,7 +268,7 @@ export const AdminDashboard: React.FC = () => {
           className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-[#163832]/50 hover:-translate-y-0.5 active:scale-[0.98] group"
         >
           <div className="flex items-center justify-between text-xs font-mono text-[#596560] uppercase group-hover:text-[#163832] transition-colors">
-            <span>Est. Sys. Savings</span>
+            <span>Estimated System Savings</span>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#163832] group-hover:scale-110 transition-transform"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>
           </div>
 

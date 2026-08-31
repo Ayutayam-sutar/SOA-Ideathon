@@ -31,7 +31,7 @@ export interface CombinedRiskResult {
 
 export const riskPredictionService = {
   // Accepts dynamic route duration and transfer count from the scoring engine
-  async predictSpoilageRisk(shipmentId: string, routeDurationHours: number = 48.0, transferCount: number = 1.0): Promise<SpoilageRiskResult> {
+  async predictSpoilageRisk(shipmentId: string, routeDurationHours: number = 48.0, transferCount: number = 1.0, expectedDelayMinutes: number = 0.0): Promise<SpoilageRiskResult> {
     const shipmentResult = await db.select().from(shipments).where(eq(shipments.id, shipmentId)).limit(1);
     if (shipmentResult.length === 0) throw new Error('Shipment not found');
     const shipment = shipmentResult[0];
@@ -87,7 +87,7 @@ export const riskPredictionService = {
       temperature_excursion_minutes,
       observed_excursion_count,
       base_transit_hr: routeDurationHours, // Dynamic route hours
-      delay_minutes: 0.0, 
+      delay_minutes: expectedDelayMinutes, 
       transfer_count: transferCount,       // Dynamic route transfers
       weight_kg: shipment.weightKg || 1000,
       kinetic_lost_hours: kineticShelfLifeLostHours
@@ -135,6 +135,8 @@ export const riskPredictionService = {
     let required_max_temp_c = 8.0;
     let delivery_deadline_hr = 48.0;
 
+    let pickup_hour = 10.0;
+
     if (shipmentId) {
       try {
         const shpResult = await db.select().from(shipments).where(eq(shipments.id, shipmentId)).limit(1);
@@ -145,6 +147,7 @@ export const riskPredictionService = {
           required_min_temp_c = shp.targetTempMin;
           required_max_temp_c = shp.targetTempMax;
           delivery_deadline_hr = shp.slaMaxDeliveryHours || 48.0;
+          pickup_hour = shp.pickupStartHour || 10.0;
         }
       } catch (err) {
         console.warn("[RiskPrediction] Failed to load shipment info for delay features, using defaults.", err);
@@ -154,6 +157,7 @@ export const riskPredictionService = {
     const transport_mode = candidateLegs?.[0]?.mode || "road_reefer";
     const base_transit_hr = candidateLegs ? candidateLegs.reduce((acc: number, l: any) => acc + (l.durationHours || 0), 0) : 24.0;
     const transfer_count = candidateLegs ? Math.max(0, candidateLegs.length - 1) : 1.0;
+    const avg_reliability = candidateLegs && candidateLegs.length > 0 ? candidateLegs.reduce((acc: number, l: any) => acc + (l.reliabilityScore || 95.0), 0) / candidateLegs.length : 95.0;
 
     const mlFeatures = {
       product_type,
@@ -162,13 +166,13 @@ export const riskPredictionService = {
       base_transit_hr,
       required_min_temp_c,
       required_max_temp_c,
-      pickup_hour: 10.0,
+      pickup_hour,
       delivery_deadline_hr,
       transfer_count,
-      rain_flag: 0.0,
-      congestion_index: 0.3,
-      historical_route_reliability: 95.0,
-      route_reliability_feature: 95.0
+      rain_flag: 0.0, // Usually queried from weather API
+      congestion_index: 0.3, // Usually queried from traffic API
+      historical_route_reliability: avg_reliability,
+      route_reliability_feature: avg_reliability
     };
 
     try {

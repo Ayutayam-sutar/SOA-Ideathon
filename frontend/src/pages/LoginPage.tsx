@@ -206,6 +206,15 @@ export const LoginPage: React.FC = () => {
                   )}
                 </button>
               </div>
+
+              {role === 'business' && (
+                <div className="text-center pt-1">
+                  <span className="text-[#596560]">New business? </span>
+                  <Link to={`/register`} className="text-[#5C7A50] font-bold hover:underline">
+                    Create an account
+                  </Link>
+                </div>
+              )}
             </form>
 
             <div className="pt-4 border-t border-[#E5EBE3] flex items-center justify-between text-xs font-sans">

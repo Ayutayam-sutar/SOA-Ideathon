@@ -3,6 +3,21 @@ import { User } from '../types';
 const API_URL = 'http://localhost:3001/api/auth';
 
 export const authService = {
+  async register(data: any): Promise<void> {
+    const response = await fetch(`${API_URL}/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    const resData = await response.json();
+    if (!resData.success) {
+      throw new Error(resData.error || 'Registration failed');
+    }
+  },
+
   async login(email: string, password: string, role?: string): Promise<{ token: string, user: User }> {
     const response = await fetch(`${API_URL}/login`, {
       method: 'POST',
