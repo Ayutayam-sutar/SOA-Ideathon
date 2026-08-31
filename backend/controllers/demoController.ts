@@ -6,16 +6,15 @@ import { requireAuth, requireRole } from '../middleware/auth';
 import { consolidationEngine } from '../services/consolidationEngine';
 /** Clear demo-related tables (in FK-safe order, topological) */
 async function clearDemoData() {
-  // Full topological deletion order for all tables:
+  // Full topological deletion order for all demo tables:
   // temperatureLogEntries → incidentReports → routeLegs → deliveryRoutes
-  //   → clusterShipments → consolidationClusters → vehicles → shipments
+  //   → clusterShipments → consolidationClusters → shipments
   await db.delete(temperatureLogEntries); // FK: → shipments.id
   await db.delete(incidentReports);       // FK: → shipments.id
   await db.delete(routeLegs);             // FK: → delivery_routes.id
   await db.delete(clusterShipments);      // FK: → consolidation_clusters.id + shipments.id
   await db.delete(deliveryRoutes);        // FK: → consolidation_clusters.id
   await db.delete(consolidationClusters);
-  await db.delete(vehicles);
   await db.delete(shipments);
 }
 
@@ -35,39 +34,36 @@ async function seedDemoData() {
     { id: 'USR-BIZ-DEMO-01', email: 'demo@farmco.in', passwordHash: '$2b$10$kTCEHO1NFipwfDr9yhxqZOZe8vCoZbvtE1lB3N4USvVuNfub30MVG', role: 'business', businessId: 'BUS-001' },
   ]).onConflictDoNothing();
 
-
-  // Vehicles – match schema fields
-  const [vehicleA] = await db
+  // Vehicles – ensure demo vehicles exist without dropping existing fleet
+  await db
     .insert(vehicles)
-    .values({
-      id: 'VEH-001',
-      vehicleType: 'reefer_truck',
-      capacityKg: 2000,
-      minTempC: 0,
-      maxTempC: 8,
-      currentLocation: 'Bhubaneswar Central Cold Hub',
-      status: 'available',
-      costPerKmInr: 5,
-      reliability: 0.95,
-      temperatureControlScore: 0.9,
-    })
-    .returning();
-
-  const [vehicleB] = await db
-    .insert(vehicles)
-    .values({
-      id: 'VEH-002',
-      vehicleType: 'reefer_truck',
-      capacityKg: 1500,
-      minTempC: 0,
-      maxTempC: 8,
-      currentLocation: 'Kolkata Distribution Hub',
-      status: 'available',
-      costPerKmInr: 4.5,
-      reliability: 0.92,
-      temperatureControlScore: 0.88,
-    })
-    .returning();
+    .values([
+      {
+        id: 'VEH-001',
+        vehicleType: 'reefer_truck',
+        capacityKg: 2000,
+        minTempC: 0,
+        maxTempC: 8,
+        currentLocation: 'Bhubaneswar Central Cold Hub',
+        status: 'available',
+        costPerKmInr: 5,
+        reliability: 0.95,
+        temperatureControlScore: 0.9,
+      },
+      {
+        id: 'VEH-002',
+        vehicleType: 'reefer_truck',
+        capacityKg: 1500,
+        minTempC: 0,
+        maxTempC: 8,
+        currentLocation: 'Kolkata Distribution Hub',
+        status: 'available',
+        costPerKmInr: 4.5,
+        reliability: 0.92,
+        temperatureControlScore: 0.88,
+      }
+    ])
+    .onConflictDoNothing();
 
   // Shipments – include required fields from schema
   const baseShipment = {
@@ -182,8 +178,8 @@ async function seedDemoData() {
   }
 }
 
-/** Handler – reset + seed demo data. Only admin users should hit this endpoint. */
-export const resetDemo = [requireAuth, requireRole(['admin']), async (req: Request, res: Response, next: NextFunction) => {
+/** Handler – reset + seed demo data. Allows authenticated users (admin, business, agent) to load demo scenario. */
+export const resetDemo = [requireAuth, requireRole(['admin', 'business', 'agent']), async (req: Request, res: Response, next: NextFunction) => {
   try {
     await clearDemoData();
     await seedDemoData();

@@ -2,6 +2,7 @@ import { db } from '../db';
 import { shipments, hubs, vehicles, clusterShipments, deliveryRoutes, routeLegs } from '../db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { riskPredictionService } from './riskPrediction';
+import { getLocationCoords, getRouteLegCoordinates } from './locationHelper';
 
 // Configurable weights for plan scoring
 const DEFAULT_SCORE_WEIGHTS = {
@@ -298,6 +299,35 @@ export const consolidationEngine = {
     // Candidate Transport Plans
     const candidates: any[] = [];
 
+    // Helper to generate full leg telemetry & coordinates
+    const buildLeg = (legId: string, seq: number, mode: 'road_reefer' | 'rail_cold_wagon', fromName: string, toName: string, dist: number, dur: number, vType: string, carrier: string, speed: number, delayMin: number, reliability: number, onTime: number) => {
+      const origCoords = getLocationCoords(fromName);
+      const destCoords = getLocationCoords(toName);
+      const coords = getRouteLegCoordinates(legId, seq, fromName, toName);
+
+      return {
+        id: legId,
+        legNumber: seq,
+        mode,
+        originName: fromName,
+        destinationName: toName,
+        originCoords: origCoords,
+        destinationCoords: destCoords,
+        coordinates: coords,
+        distanceKm: dist,
+        durationHours: dur,
+        vehicleId: `VEH-${mode === 'rail_cold_wagon' ? 'RAIL' : 'REEFER'}-${seq}`,
+        vehicleType: vType,
+        carrier,
+        status: 'pending',
+        avgSpeedKmh: speed,
+        tempMonitored: true,
+        avgDelayMinutes: delayMin,
+        reliabilityScore: reliability,
+        onTimePercent: onTime,
+      };
+    };
+
     // Candidate 1: Direct Road
     const roadCost = Math.round(distanceKm * 35);
     candidates.push({
@@ -305,51 +335,27 @@ export const consolidationEngine = {
       cost: roadCost,
       durationHours: Number((distanceKm / 45).toFixed(1)),
       transfers: 0,
-      legs: [{
-        id: `${routeId}-C1-L1`, legNumber: 1, mode: 'road_reefer',
-        originName: originLoc.name, destinationName: destLoc.name,
-        distanceKm, durationHours: Number((distanceKm / 45).toFixed(1)),
-        vehicleId: 'TBD Linehaul', vehicleType: 'Heavy Reefer', carrier: 'Karwaan Fleet',
-        status: 'pending', avgSpeedKmh: 45, tempMonitored: true,
-        avgDelayMinutes: Math.round(distanceKm * 0.05), reliabilityScore: 88, onTimePercent: 90
-      }]
+      legs: [
+        buildLeg(`${routeId}-C1-L1`, 1, 'road_reefer', originLoc.name, destLoc.name, distanceKm, Number((distanceKm / 45).toFixed(1)), 'Heavy Reefer Truck', 'Karwaan Fleet', 45, Math.round(distanceKm * 0.05), 88, 90)
+      ]
     });
 
     // Candidate 2: Multimodal (Road -> Rail -> Road)
     if (distanceKm > 200 && (originLoc.railAccess || destLoc.railAccess)) {
       const railCost = Math.round(distanceKm * 18 + 4000);
       const railTransitTime = Number(((distanceKm - 40) / 60 + 3.5).toFixed(1));
-      
+      const railOrigName = originLoc.name.toLowerCase().includes('terminal') || originLoc.name.toLowerCase().includes('hub') ? originLoc.name : `${originLoc.name} Rail Hub`;
+      const railDestName = destLoc.name.toLowerCase().includes('terminal') || destLoc.name.toLowerCase().includes('hub') ? destLoc.name : `${destLoc.name} Rail Hub`;
+
       candidates.push({
         type: 'multimodal',
         cost: railCost,
         durationHours: railTransitTime,
         transfers: 2,
         legs: [
-          {
-            id: `${routeId}-C2-L1`, legNumber: 1, mode: 'road_reefer',
-            originName: originLoc.name, destinationName: `${originLoc.name} Rail Hub`,
-            distanceKm: 20, durationHours: 1.0,
-            vehicleId: 'TBD Feeder', vehicleType: 'Feeder Reefer', carrier: 'Local Fleet',
-            status: 'pending', avgSpeedKmh: 25, tempMonitored: true,
-            avgDelayMinutes: 10, reliabilityScore: 92, onTimePercent: 95
-          },
-          {
-            id: `${routeId}-C2-L2`, legNumber: 2, mode: 'rail_cold_wagon',
-            originName: `${originLoc.name} Rail Hub`, destinationName: `${destLoc.name} Rail Terminal`,
-            distanceKm: distanceKm - 40, durationHours: Number(((distanceKm - 40) / 60).toFixed(1)),
-            vehicleId: 'TBD Rail', vehicleType: 'Kisan Rail Cold Rake', carrier: 'Indian Railways',
-            status: 'pending', avgSpeedKmh: 60, tempMonitored: true,
-            avgDelayMinutes: 35, reliabilityScore: 85, onTimePercent: 88
-          },
-          {
-            id: `${routeId}-C2-L3`, legNumber: 3, mode: 'road_reefer',
-            originName: `${destLoc.name} Rail Terminal`, destinationName: destLoc.name,
-            distanceKm: 20, durationHours: 1.0,
-            vehicleId: 'TBD Feeder', vehicleType: 'Feeder Reefer', carrier: 'Local Fleet',
-            status: 'pending', avgSpeedKmh: 25, tempMonitored: true,
-            avgDelayMinutes: 10, reliabilityScore: 92, onTimePercent: 95
-          }
+          buildLeg(`${routeId}-C2-L1`, 1, 'road_reefer', originLoc.name, railOrigName, 20, 1.0, 'Feeder Reefer (First Mile)', 'Local Agri Carrier', 25, 10, 92, 95),
+          buildLeg(`${routeId}-C2-L2`, 2, 'rail_cold_wagon', railOrigName, railDestName, Math.max(10, distanceKm - 40), Number(((distanceKm - 40) / 60).toFixed(1)), 'Kisan Rail Cold Wagon Rake', 'Indian Railways Freight', 60, 35, 85, 88),
+          buildLeg(`${routeId}-C2-L3`, 3, 'road_reefer', railDestName, destLoc.name, 20, 1.0, 'Feeder Reefer (Last Mile)', 'Regional Cold Fleet', 25, 10, 92, 95)
         ]
       });
     }
@@ -361,14 +367,9 @@ export const consolidationEngine = {
       cost: expressCost,
       durationHours: Number((distanceKm / 65).toFixed(1)),
       transfers: 0,
-      legs: [{
-        id: `${routeId}-C3-L1`, legNumber: 1, mode: 'road_reefer',
-        originName: originLoc.name, destinationName: destLoc.name,
-        distanceKm, durationHours: Number((distanceKm / 65).toFixed(1)),
-        vehicleId: 'TBD Express', vehicleType: 'Light Express Reefer', carrier: 'Karwaan Express',
-        status: 'pending', avgSpeedKmh: 65, tempMonitored: true,
-        avgDelayMinutes: Math.round(distanceKm * 0.02), reliabilityScore: 96, onTimePercent: 98
-      }]
+      legs: [
+        buildLeg(`${routeId}-C3-L1`, 1, 'road_reefer', originLoc.name, destLoc.name, distanceKm, Number((distanceKm / 65).toFixed(1)), 'Light Express Reefer', 'Karwaan SuperFast Express', 65, Math.round(distanceKm * 0.02), 96, 98)
+      ]
     });
 
     let bestCandidate = null;

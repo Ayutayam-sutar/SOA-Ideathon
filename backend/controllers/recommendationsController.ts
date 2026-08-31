@@ -70,7 +70,7 @@ export const recommendPlan = async (req: Request, res: Response, next: NextFunct
       return res.status(403).json({ error: 'Forbidden. You do not own this shipment.' });
     }
 
-    const routeInfo = getShipmentRouteInfo(shipment.id, shipment.cargoType);
+    const routeInfo = getShipmentRouteInfo(shipment.id, shipment.cargoType, shipment.origin || undefined, shipment.destination || undefined);
     const originName = typeof shipment.origin === 'string' && shipment.origin ? shipment.origin : (routeInfo.origin?.name || routeInfo.origin);
     const destName = typeof shipment.destination === 'string' && shipment.destination ? shipment.destination : (routeInfo.destination?.name || routeInfo.destination);
 

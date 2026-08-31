@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 
-import { CheckCircle2, Boxes, Layers, ThermometerSnowflake, ShieldAlert } from "lucide-react";
+import { CheckCircle2, Boxes, Layers, ThermometerSnowflake, ShieldAlert, ArrowUpRight } from "lucide-react";
 
 import { FreshnessGauge } from "../../components/FreshnessGauge";
 import { dataService } from "../../services/dataService";
@@ -14,6 +15,7 @@ import {
 } from "../../types";
 
 export const AdminDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [clusters, setClusters] = useState<ConsolidationCluster[]>([]);
@@ -24,8 +26,6 @@ export const AdminDashboard: React.FC = () => {
   const [reoptimizeSuccessMsg, setReoptimizeSuccessMsg] = useState<
     string | null
   >(null);
-  const [demoLoading, setDemoLoading] = useState<boolean>(false);
-  const [demoError, setDemoError] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -130,43 +130,16 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#D6DCD4] pb-3">
-        <div>
-          <h1 className="font-display font-bold text-2xl text-[#163832]">
-            Platform Operations & Consolidation Grid
-          </h1>
+      <div className="border-b border-[#D6DCD4] pb-3">
+        <h1 className="font-display font-bold text-2xl text-[#163832]">
+          Platform Operations & Consolidation Grid
+        </h1>
 
-          <p className="text-xs text-[#596560] font-sans mt-0.5">
-            Live multi-shipper cold corridor optimization and spoilage risk
-            dispatch
-          </p>
-        </div>
-        
-        <button
-          onClick={async () => {
-            try {
-              setDemoLoading(true);
-              setDemoError(null);
-              await dataService.resetDemoData();
-              window.location.reload();
-            } catch (err) {
-              setDemoError('Failed to load demo scenario.');
-            } finally {
-              setDemoLoading(false);
-            }
-          }}
-          disabled={demoLoading}
-          className="px-4 py-2 bg-[#5C7A50] hover:bg-[#4a6341] text-white rounded font-mono text-xs font-bold tracking-wider transition-colors shadow-sm disabled:opacity-50"
-        >
-          {demoLoading ? 'LOADING DEMO...' : 'LOAD DEMO SCENARIO'}
-        </button>
+        <p className="text-xs text-[#596560] font-sans mt-0.5">
+          Live multi-shipper cold corridor optimization and spoilage risk
+          dispatch
+        </p>
       </div>
-
-      {demoError && (
-        <div className="bg-red-50 text-red-600 px-4 py-2 rounded text-xs font-mono border border-red-200">
-          {demoError}
-        </div>
-      )}
 
       {reoptimizeSuccessMsg && (
         <div className="bg-[#163832] text-[#FFFFFF] px-4 py-3 rounded-[6px] border border-[#245249] flex items-center justify-between text-xs font-mono animate-in fade-in duration-200">
@@ -182,10 +155,14 @@ export const AdminDashboard: React.FC = () => {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
-        <div className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-mono text-[#596560] uppercase">
+        {/* Card 1: Active Shipments -> /admin/shipments */}
+        <div
+          onClick={() => navigate('/admin/shipments')}
+          className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-[#163832]/50 hover:-translate-y-0.5 active:scale-[0.98] group"
+        >
+          <div className="flex items-center justify-between text-xs font-mono text-[#596560] uppercase group-hover:text-[#163832] transition-colors">
             <span>Active Shipments</span>
-            <Boxes className="w-4 h-4 text-[#163832]" />
+            <Boxes className="w-4 h-4 text-[#163832] group-hover:scale-110 transition-transform" />
           </div>
 
           <div className="font-mono font-bold text-2xl text-[#163832] mt-1">
@@ -197,10 +174,14 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-mono text-[#596560] uppercase">
+        {/* Card 2: Consolidation Clusters -> /admin/clusters */}
+        <div
+          onClick={() => navigate('/admin/clusters')}
+          className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-[#5C7A50]/50 hover:-translate-y-0.5 active:scale-[0.98] group"
+        >
+          <div className="flex items-center justify-between text-xs font-mono text-[#596560] uppercase group-hover:text-[#5C7A50] transition-colors">
             <span>Consolidation Clusters</span>
-            <Layers className="w-4 h-4 text-[#5C7A50]" />
+            <Layers className="w-4 h-4 text-[#5C7A50] group-hover:scale-110 transition-transform" />
           </div>
 
           <div className="font-mono font-bold text-2xl text-[#5C7A50] mt-1">
@@ -212,10 +193,14 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-mono text-[#596560] uppercase">
+        {/* Card 3: At-Risk Cargo -> /admin/shipments */}
+        <div
+          onClick={() => navigate('/admin/shipments')}
+          className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-[#D98E2B]/50 hover:-translate-y-0.5 active:scale-[0.98] group"
+        >
+          <div className="flex items-center justify-between text-xs font-mono text-[#596560] uppercase group-hover:text-[#D98E2B] transition-colors">
             <span>At-Risk Cargo (&lt;50%)</span>
-            <ThermometerSnowflake className="w-4 h-4 text-[#D98E2B]" />
+            <ThermometerSnowflake className="w-4 h-4 text-[#D98E2B] group-hover:scale-110 transition-transform" />
           </div>
 
           <div
@@ -232,10 +217,14 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-mono text-[#596560] uppercase">
+        {/* Card 4: Open Incidents -> /admin/incidents */}
+        <div
+          onClick={() => navigate('/admin/incidents')}
+          className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-[#B3462C]/50 hover:-translate-y-0.5 active:scale-[0.98] group"
+        >
+          <div className="flex items-center justify-between text-xs font-mono text-[#596560] uppercase group-hover:text-[#B3462C] transition-colors">
             <span>Open Incidents</span>
-            <ShieldAlert className="w-4 h-4 text-[#B3462C]" />
+            <ShieldAlert className="w-4 h-4 text-[#B3462C] group-hover:scale-110 transition-transform" />
           </div>
 
           <div
@@ -254,10 +243,14 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-mono text-[#596560] uppercase">
+        {/* Card 5: Available Fleet -> /admin/routes */}
+        <div
+          onClick={() => navigate('/admin/routes')}
+          className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-[#5C7A50]/50 hover:-translate-y-0.5 active:scale-[0.98] group"
+        >
+          <div className="flex items-center justify-between text-xs font-mono text-[#596560] uppercase group-hover:text-[#5C7A50] transition-colors">
             <span>Available Fleet</span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#5C7A50]"><rect width="16" height="16" x="4" y="4" rx="2" /><rect width="4" height="6" x="10" y="10" rx="1" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#5C7A50] group-hover:scale-110 transition-transform"><rect width="16" height="16" x="4" y="4" rx="2" /><rect width="4" height="6" x="10" y="10" rx="1" /></svg>
           </div>
 
           <div className="font-mono font-bold text-2xl text-[#163832] mt-1">
@@ -269,10 +262,14 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-mono text-[#596560] uppercase">
+        {/* Card 6: Est. Sys. Savings -> /admin/clusters */}
+        <div
+          onClick={() => navigate('/admin/clusters')}
+          className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-[#163832]/50 hover:-translate-y-0.5 active:scale-[0.98] group"
+        >
+          <div className="flex items-center justify-between text-xs font-mono text-[#596560] uppercase group-hover:text-[#163832] transition-colors">
             <span>Est. Sys. Savings</span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#163832]"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#163832] group-hover:scale-110 transition-transform"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>
           </div>
 
           <div className="font-mono font-bold text-2xl text-[#163832] mt-1 truncate">
@@ -374,19 +371,21 @@ export const AdminDashboard: React.FC = () => {
               </span>
             </div>
 
-            <a
-              href="/admin/shipments"
-              className="text-xs font-mono text-[#163832] font-semibold hover:underline"
+            <Link
+              to="/admin/shipments"
+              className="text-xs font-mono text-[#163832] font-semibold hover:underline flex items-center gap-1"
             >
-              View All {shipments.length} Shipments →
-            </a>
+              <span>View All {shipments.length} Shipments</span>
+              <span>→</span>
+            </Link>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {shipments.slice(0, 3).map((shipment) => (
               <div
                 key={shipment.id}
-                className="p-3.5 bg-[#F8FAF7] border border-[#E5EBE3] rounded-[6px] flex items-center justify-between"
+                onClick={() => navigate('/admin/shipments')}
+                className="p-3.5 bg-[#F8FAF7] border border-[#E5EBE3] rounded-[6px] flex items-center justify-between cursor-pointer transition-all hover:bg-[#F0F4EE] hover:border-[#D6DCD4] hover:shadow-sm"
               >
                 <div className="space-y-1 pr-2">
                   <div className="flex items-center gap-2">

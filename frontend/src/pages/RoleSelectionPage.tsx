@@ -45,8 +45,11 @@ export const RoleSelectionPage: React.FC = () => {
       icon: Navigation,
       buttonBg: 'bg-[#D98E2B] hover:bg-[#B5721C] text-[#FFFFFF]',
       demoAccount: 'agent1@karwaan.in (Reefer Captain)',
+      hidden: true,
     },
   ];
+
+  const visibleRoles = roles.filter((r) => !r.hidden);
 
   return (
     <div className="min-h-screen bg-[#F3F5F2] text-[#1A211E] flex flex-col">
@@ -80,26 +83,26 @@ export const RoleSelectionPage: React.FC = () => {
             Select your operational role
           </h1>
           <p className="text-sm text-[#596560] leading-relaxed">
-            Karwaan provides three purpose-built interfaces tailored to platform administrators,
-            agricultural shippers, and on-ground delivery captains.
+            Karwaan provides purpose-built interfaces tailored to platform administrators
+            and agricultural shippers.
           </p>
         </div>
 
-        {/* 3 Role Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {roles.map((role) => {
+        {/* 2 Role Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto w-full">
+          {visibleRoles.map((role) => {
             const Icon = role.icon;
             return (
               <div
                 key={role.id}
                 onClick={() => navigate(`/login/${role.id}`)}
-                className={`bg-[#FFFFFF] border-2 ${role.borderClass} rounded-[6px] p-6 flex flex-col justify-between cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-md group select-none`}
+                className={`bg-[#FFFFFF] border-2 ${role.borderClass} rounded-[8px] p-8 flex flex-col justify-between cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg group select-none`}
               >
                 <div className="space-y-4">
                   {/* Top Badge & Icon */}
                   <div className="flex items-center justify-between">
-                    <div className={`w-11 h-11 rounded ${role.badgeBg} flex items-center justify-center shadow-sm`}>
-                      <Icon className="w-5 h-5" />
+                    <div className={`w-12 h-12 rounded-xl ${role.badgeBg} flex items-center justify-center shadow-sm`}>
+                      <Icon className="w-6 h-6" />
                     </div>
                     <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-[#596560]">
                       ROLE: {role.id.toUpperCase()}
@@ -107,7 +110,7 @@ export const RoleSelectionPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <h3 className="font-display font-bold text-xl text-[#163832] group-hover:text-[#0F2622]">
+                    <h3 className="font-display font-bold text-2xl text-[#163832] group-hover:text-[#0F2622]">
                       {role.title}
                     </h3>
                     <p className="text-xs font-mono font-medium text-[#596560] mt-0.5">
@@ -115,22 +118,22 @@ export const RoleSelectionPage: React.FC = () => {
                     </p>
                   </div>
 
-                  <p className="text-xs text-[#596560] leading-relaxed">
+                  <p className="text-sm text-[#596560] leading-relaxed">
                     {role.description}
                   </p>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-[#E5EBE3] space-y-3">
-                  <div className="text-[11px] font-mono text-[#596560]">
-                    <span className="text-[#1A211E] font-semibold">Demo ID:</span> {role.demoAccount}
+                <div className="mt-8 pt-5 border-t border-[#E5EBE3] space-y-3">
+                  <div className="text-[12px] font-mono text-[#596560]">
+                    <span className="text-[#1A211E] font-semibold">Account:</span> {role.demoAccount}
                   </div>
 
                   <button
                     type="button"
-                    className={`w-full py-2.5 px-4 rounded ${role.buttonBg} text-xs font-sans font-semibold tracking-wide flex items-center justify-center gap-1.5 transition-colors shadow-sm`}
+                    className={`w-full py-3 px-4 rounded-xl ${role.buttonBg} text-sm font-sans font-semibold tracking-wide flex items-center justify-center gap-2 transition-colors shadow-sm`}
                   >
                     <span>Proceed as {role.title.split('/')[0].trim()}</span>
-                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </button>
                 </div>
               </div>

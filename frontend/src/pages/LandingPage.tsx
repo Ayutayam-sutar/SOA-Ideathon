@@ -174,7 +174,7 @@ export const LandingPage: React.FC = () => {
                 Experience Karwaan from any operational perspective.
               </h3>
               <p className="text-xs sm:text-sm text-white/80 max-w-xl">
-                Test the Platform Admin operations board, the Business Shipper order portal, or the mobile-first Delivery Agent interface with live mock telemetry.
+                Test the Platform Admin operations board or the Business Shipper order portal with live telemetry.
               </p>
             </div>
 

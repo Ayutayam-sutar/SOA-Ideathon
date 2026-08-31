@@ -59,7 +59,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
   const accountRequests = [
     { path: '/admin/shipper-requests', label: 'Shipper Requests', description: 'New registrations', icon: UserPlus },
-    { path: '/admin/agent-requests', label: 'Agent Requests', description: 'New driver approvals', icon: UserCheck },
+    // { path: '/admin/agent-requests', label: 'Agent Requests', description: 'New driver approvals', icon: UserCheck },
   ];
 
   const isActive = (path: string) => {

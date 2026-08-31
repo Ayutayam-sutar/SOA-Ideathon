@@ -22,44 +22,59 @@ export const locationCoordsMap: Record<string, [number, number]> = {
   "koraput": [18.8140, 82.7126],
   "malkangiri": [18.3436, 81.8845],
   "balangir": [20.7107, 83.4866],
+  "berhampur": [19.3149, 84.7941],
+  "gopalpur": [19.2611, 84.9099],
+  "sambalpur": [21.4685, 83.9782],
+  "angul": [20.8400, 85.1500],
+  "jharsuguda": [21.8554, 84.0062],
 
-  // National Trunk Corridors & Rail Terminals
+  // Northern & NCR Hubs
   "delhi": [28.6139, 77.2090],
   "new delhi": [28.6139, 77.2090],
   "delhi ncr logistics hub": [28.6139, 77.2090],
+  "haryana": [29.0588, 76.0856],
+  "harayana": [29.0588, 76.0856],
+  "gurugram": [28.4595, 77.0266],
+  "gurgaon": [28.4595, 77.0266],
+  "faridabad": [28.4089, 77.3178],
+  "panipat": [29.3909, 76.9635],
+  "sonipat": [28.9931, 77.0151],
+  "chandigarh": [30.7333, 76.7794],
+  "ludhiana": [30.9010, 75.8573],
+  "amritsar": [31.6340, 74.8723],
+  "jaipur": [26.9124, 75.7873],
+  "lucknow": [26.8467, 80.9462],
+  "kanpur": [26.4542, 80.3503],
+  "kanpur central": [26.4542, 80.3503],
+  "prayagraj": [25.4484, 81.8284],
+  "varanasi": [25.3176, 82.9739],
+
+  // Eastern & Central Hubs
   "kolkata": [22.5726, 88.3639],
   "kolkata wholesale hub": [22.5726, 88.3639],
   "hijli": [22.3168, 87.3183],
   "tatanagar junction": [22.7758, 86.2036],
   "tatanagar": [22.7758, 86.2036],
-  "muri junction": [23.3644, 85.8569],
-  "bokaro steel city": [23.6339, 86.0963],
-  "gomoh junction": [23.8647, 86.1264],
-  "koderma junction": [24.4361, 85.5925],
-  "gaya junction": [24.8016, 84.9984],
-  "pt. deen dayal upadhyaya junction": [25.2818, 83.1232],
-  "mughalsarai": [25.2818, 83.1232],
-  "prayagraj junction": [25.4484, 81.8284],
-  "prayagraj": [25.4484, 81.8284],
-  "kanpur central": [26.4542, 80.3503],
-  "kanpur": [26.4542, 80.3503],
-  "patna": [25.6093, 85.1376],
+  "jamshedpur": [22.8046, 86.2029],
+  "ranchi": [23.3441, 85.3096],
   "dhanbad": [23.7957, 86.4304],
+  "patna": [25.6093, 85.1376],
   "raipur": [21.2514, 81.6296],
+  "nagpur": [21.1458, 79.0882],
+
+  // Southern & Western Hubs
   "vizag": [17.6868, 83.2185],
   "visakhapatnam": [17.6868, 83.2185],
   "hyderabad": [17.3850, 78.4867],
   "bengaluru": [12.9716, 77.5946],
+  "bangalore": [12.9716, 77.5946],
   "chennai": [13.0827, 80.2707],
-
-  // Western Corridor Hubs
   "mumbai": [19.0760, 72.8777],
   "vashi apmc": [19.0759, 72.9984],
   "pune": [18.5204, 73.8567],
-  "nagpur": [21.1458, 79.0882],
   "nashik": [20.0988, 73.9189],
-  "satara": [17.6805, 74.0183],
-  "ratnagiri": [16.9902, 73.3120],
+  "ahmedabad": [23.0225, 72.5714],
+  "surat": [21.1702, 72.8311],
   "indore": [22.7196, 75.8577]
 };
 
@@ -131,7 +146,10 @@ export function getRouteCurrentLocation(routeId: string): { currentLocation: [nu
 // Dynamically extract real origin & destination from the shipment object
 export function getShipmentRouteInfo(shipmentId: string, cargoType?: string, origin?: string, destination?: string) {
   if (dynamicLocationsCache.has(shipmentId)) {
-    return dynamicLocationsCache.get(shipmentId)!;
+    const cached = dynamicLocationsCache.get(shipmentId)!;
+    if ((!origin || cached.origin.name === origin) && (!destination || cached.destination.name === destination)) {
+      return cached;
+    }
   }
 
   // Use the actual origin/destination passed in from the database
@@ -141,7 +159,7 @@ export function getShipmentRouteInfo(shipmentId: string, cargoType?: string, ori
   const origCoords = getLocationCoords(originName);
   const destCoords = getLocationCoords(destName);
 
-  return {
+  const routeInfo = {
     origin: { 
       name: originName, 
       lat: origCoords[0], 
@@ -155,4 +173,7 @@ export function getShipmentRouteInfo(shipmentId: string, cargoType?: string, ori
       address: `${destName}, Delivery Hub` 
     }
   };
+
+  dynamicLocationsCache.set(shipmentId, routeInfo);
+  return routeInfo;
 }

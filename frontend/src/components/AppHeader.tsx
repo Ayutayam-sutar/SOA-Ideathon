@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { User, UserRole } from '../types';
 import { dataService } from '../services/dataService';
-import { Shield, Briefcase, Navigation, RefreshCw, ArrowRightLeft } from 'lucide-react';
+import { Shield, Briefcase, Navigation, ArrowRightLeft } from 'lucide-react';
 
 interface AppHeaderProps {
   user: User | null;
@@ -101,20 +101,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ user, activeRole }) => {
 
           {/* Right Navigation & Actions */}
           <div className="flex items-center gap-2 sm:gap-4">
-
-            {/* Reset Demo Data Button */}
-            <button
-              type="button"
-              onClick={() => {
-                dataService.resetDemoData();
-                window.location.reload();
-              }}
-              title="Reset mock data to pristine default state"
-              className="p-2 sm:px-3 sm:py-2 rounded-lg bg-black/15 hover:bg-black/30 text-white/90 hover:text-white transition-all duration-300 border border-white/10 hover:border-white/30 shadow-sm flex items-center gap-2 group backdrop-blur-sm"
-            >
-              <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-700 ease-in-out" />
-              <span className="hidden md:inline font-mono text-[11px] font-bold uppercase tracking-wider">Reset</span>
-            </button>
 
             {/* User Profile Capsule - Hidden on mobile to save space */}
             {user && (
