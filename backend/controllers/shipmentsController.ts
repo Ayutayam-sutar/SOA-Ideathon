@@ -40,7 +40,7 @@ export const getShipments = async (req: Request, res: Response, next: NextFuncti
     const formattedShipments = await Promise.all(results.map(async ({ shipment, business }) => {
       const logs = await db.select().from(temperatureLogEntries).where(eq(temperatureLogEntries.shipmentId, shipment.id)).orderBy(desc(temperatureLogEntries.timestamp)).limit(20);
       
-      const routeInfo = getShipmentRouteInfo(shipment.id, shipment.cargoType);
+      const routeInfo = getShipmentRouteInfo(shipment.id, shipment.cargoType, shipment.origin || undefined, shipment.destination || undefined);
 
       // Pad to perfectly match the frontend 'Shipment' type
       return {
@@ -48,7 +48,7 @@ export const getShipments = async (req: Request, res: Response, next: NextFuncti
         code: shipment.id,
         businessName: business.name,
         category: SEED_DEFAULT_CATEGORY,
-        weightKg: SEED_DEFAULT_WEIGHT_KG,
+        weightKg: shipment.weightKg != null ? shipment.weightKg : SEED_DEFAULT_WEIGHT_KG,
         volumeCbm: SEED_DEFAULT_VOLUME_CBM,
         origin: routeInfo.origin,
         destination: routeInfo.destination,
@@ -104,14 +104,14 @@ export const getShipmentById = async (req: Request, res: Response, next: NextFun
 
     const logs = await db.select().from(temperatureLogEntries).where(eq(temperatureLogEntries.shipmentId, shipment.id)).orderBy(desc(temperatureLogEntries.timestamp)).limit(20);
 
-    const routeInfo = getShipmentRouteInfo(shipment.id, shipment.cargoType);
+    const routeInfo = getShipmentRouteInfo(shipment.id, shipment.cargoType, shipment.origin || undefined, shipment.destination || undefined);
 
     const formatted = {
       ...shipment,
       code: shipment.id,
       businessName: business.name,
       category: SEED_DEFAULT_CATEGORY,
-      weightKg: SEED_DEFAULT_WEIGHT_KG,
+      weightKg: shipment.weightKg != null ? shipment.weightKg : SEED_DEFAULT_WEIGHT_KG,
       volumeCbm: SEED_DEFAULT_VOLUME_CBM,
       origin: routeInfo.origin,
       destination: routeInfo.destination,
@@ -255,7 +255,8 @@ export const updateShipment = async (req: Request, res: Response, next: NextFunc
 
     const {
       cargoType, targetTempMin, targetTempMax, totalShelfLifeHours,
-      weightKg, volumeCbm, slaMaxDeliveryHours, slaMaxSpoilagePercent, slaPriority
+      weightKg, volumeCbm, slaMaxDeliveryHours, slaMaxSpoilagePercent, slaPriority,
+      origin, destination
     } = req.body;
 
     const updates: any = {};
@@ -271,6 +272,12 @@ export const updateShipment = async (req: Request, res: Response, next: NextFunc
       if (isNaN(Number(targetTempMax))) return res.status(400).json({ error: 'targetTempMax must be a number' });
       updates.targetTempMax = Number(targetTempMax);
     }
+    if (weightKg !== undefined) {
+      if (isNaN(Number(weightKg))) return res.status(400).json({ error: 'weightKg must be a number' });
+      updates.weightKg = Number(weightKg);
+    }
+    if (origin !== undefined) updates.origin = origin;
+    if (destination !== undefined) updates.destination = destination;
     if (totalShelfLifeHours !== undefined) updates.totalShelfLifeHours = Number(totalShelfLifeHours);
     if (slaMaxDeliveryHours !== undefined) updates.slaMaxDeliveryHours = Number(slaMaxDeliveryHours);
     if (slaMaxSpoilagePercent !== undefined) updates.slaMaxSpoilagePercent = Number(slaMaxSpoilagePercent);

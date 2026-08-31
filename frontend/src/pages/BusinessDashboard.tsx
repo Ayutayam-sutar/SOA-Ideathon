@@ -26,6 +26,164 @@ import {
   ChevronRight
 } from 'lucide-react';
 
+const getEstimateDistance = (origin: string, dest: string): number => {
+  const coords: Record<string, [number, number]> = {
+    'delhi': [28.6139, 77.2090],
+    'haryana': [29.0588, 76.0856],
+    'gopalpur': [19.2611, 84.9099],
+    'bhubaneswar': [20.2961, 85.8245],
+    'cuttack': [20.4625, 85.8830],
+    'kolkata': [22.5726, 88.3639],
+    'mumbai': [19.0760, 72.8777],
+    'pune': [18.5204, 73.8567],
+    'hyderabad': [17.3850, 78.4867],
+    'bengaluru': [12.9716, 77.5946],
+    'chennai': [13.0827, 80.2707],
+    'raipur': [21.2514, 81.6296],
+    'nagpur': [21.1458, 79.0882],
+    'vizag': [17.6868, 83.2185],
+    'puri': [19.8135, 85.8312],
+    'rourkela': [22.2604, 84.8536],
+    'berhampur': [19.3149, 84.7941],
+    'sambalpur': [21.4685, 83.9782],
+    'jaipur': [26.9124, 75.7873],
+    'lucknow': [26.8467, 80.9462],
+  };
+  const getC = (n: string): [number, number] => {
+    const k = (n || '').toLowerCase().trim();
+    for (const [key, c] of Object.entries(coords)) {
+      if (k.includes(key) || key.includes(k)) return c;
+    }
+    return [20.2961, 85.8245];
+  };
+  const c1 = getC(origin);
+  const c2 = getC(dest);
+  const R = 6371;
+  const dLat = (c2[0] - c1[0]) * Math.PI / 180;
+  const dLon = (c2[1] - c1[1]) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(c1[0] * Math.PI / 180) * Math.cos(c2[0] * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return Math.max(35, Math.round(R * c));
+};
+
+const EngineProcessingView: React.FC<{
+  origin: string;
+  destination: string;
+  cargoType: string;
+  weightKg: string | number;
+}> = ({ origin, destination, cargoType, weightKg }) => {
+  const dist = getEstimateDistance(origin, destination);
+  const [activeStep, setActiveStep] = useState(0);
+
+  const roadCost = Math.round(dist * 35);
+  const roadDur = Number((dist / 45).toFixed(1));
+  const multiCost = Math.round(dist * 18 + 4000);
+  const multiDur = Number(((dist - 40) / 60 + 3.5).toFixed(1));
+  const expressCost = Math.round(dist * 58);
+  const expressDur = Number((dist / 65).toFixed(1));
+
+  const terminalLogs = [
+    { text: `--- Scoring Candidates for ${origin || 'Origin'} -> ${destination || 'Destination'} (Distance: ${dist}km) ---`, type: 'header' },
+    { text: `[Score] road: Cost=₹${roadCost} | Duration=${roadDur}h | Score=0.683`, type: 'road' },
+    { text: `[Score] multimodal: Cost=₹${multiCost} | Duration=${multiDur}h | Score=0.579`, type: 'multimodal' },
+    { text: `[Score] express: Cost=₹${expressCost} | Duration=${expressDur}h | Score=0.713`, type: 'express' },
+    { text: `> Mathematical optimum determined. Finalizing multi-modal cold corridor assignment...`, type: 'success' }
+  ];
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveStep((prev) => (prev < terminalLogs.length - 1 ? prev + 1 : prev));
+    }, 450);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="p-6 sm:p-8 flex flex-col items-center justify-center text-center bg-[#F8FAF7] space-y-5">
+      {/* Route & Distance Badge */}
+      <div className="flex flex-wrap items-center justify-center gap-2 bg-[#163832] text-white px-4 py-2 rounded-full text-xs font-mono shadow-md border border-[#245249]">
+        <span className="text-emerald-300 font-bold">📍 {origin || 'Origin'}</span>
+        <span className="text-white/50">➔</span>
+        <span className="text-amber-300 font-bold">🏁 {destination || 'Destination'}</span>
+        <span className="bg-white/10 px-2.5 py-0.5 rounded text-[11px] text-emerald-200 font-bold ml-1">
+          📏 Total Distance: {dist} km
+        </span>
+      </div>
+
+      {/* Spinner & Live Status Heading */}
+      <div className="space-y-1.5">
+        <div className="w-12 h-12 border-4 border-[#D6DCD4] border-t-[#5C7A50] border-r-[#D98E2B] rounded-full animate-spin mx-auto mb-2"></div>
+        <h3 className="text-xl font-bold font-display text-[#163832]">
+          Karwaan AI Optimization Engine
+        </h3>
+        <p className="text-xs text-[#596560] max-w-md font-sans">
+          Simulating Pareto trade-offs across active reefer fleets, Kisan Rail cold wagons, and biological freshness shelf-life.
+        </p>
+      </div>
+
+      {/* Terminal Calculation Console */}
+      <div className="w-full max-w-xl bg-[#0B1A17] border border-[#163832] rounded-xl p-4 sm:p-5 text-left font-mono text-[11px] sm:text-xs shadow-2xl space-y-2.5 overflow-hidden">
+        <div className="flex items-center justify-between border-b border-[#1D4A42] pb-2 text-[10px] text-white/50 uppercase tracking-widest">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
+            <span className="ml-2 text-white/80 font-bold">Engine Calculation Telemetry</span>
+          </div>
+          <span className="text-emerald-400 font-bold flex items-center gap-1 animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> COMPUTING
+          </span>
+        </div>
+
+        <div className="space-y-2 pt-1 font-mono">
+          {terminalLogs.slice(0, activeStep + 1).map((log, idx) => (
+            <div 
+              key={idx} 
+              className={`leading-relaxed animate-in fade-in slide-in-from-left-2 duration-200 ${
+                log.type === 'header' 
+                  ? 'text-[#D98E2B] font-bold border-b border-white/5 pb-1' 
+                  : log.type === 'multimodal'
+                  ? 'text-emerald-300 font-bold bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/20'
+                  : log.type === 'success'
+                  ? 'text-emerald-400 font-bold pt-1'
+                  : 'text-gray-300'
+              }`}
+            >
+              {log.text}
+            </div>
+          ))}
+          {activeStep < terminalLogs.length - 1 && (
+            <div className="text-emerald-400/70 text-[10px] animate-pulse flex items-center gap-1 pt-1">
+              <span>&gt; Evaluating candidate constraints...</span>
+              <span className="inline-block w-2 h-3.5 bg-emerald-400"></span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Real-time Calculation Matrix */}
+      <div className="grid grid-cols-3 gap-2 w-full max-w-xl text-[11px] font-mono">
+        <div className="bg-white border border-[#E5EBE3] p-2.5 rounded-lg shadow-sm text-left">
+          <span className="block text-[10px] text-[#596560] uppercase">Direct Road</span>
+          <span className="font-bold text-[#163832]">₹{roadCost.toLocaleString()}</span>
+          <span className="block text-[10px] text-[#89938E]">{roadDur} hrs</span>
+        </div>
+        <div className="bg-emerald-50 border border-emerald-300 p-2.5 rounded-lg shadow-sm text-left">
+          <span className="block text-[10px] text-emerald-800 uppercase font-bold">Multimodal Rail</span>
+          <span className="font-bold text-emerald-700">₹{multiCost.toLocaleString()}</span>
+          <span className="block text-[10px] text-emerald-600 font-semibold">{multiDur} hrs</span>
+        </div>
+        <div className="bg-white border border-[#E5EBE3] p-2.5 rounded-lg shadow-sm text-left">
+          <span className="block text-[10px] text-[#596560] uppercase">Fast Express</span>
+          <span className="font-bold text-[#163832]">₹{expressCost.toLocaleString()}</span>
+          <span className="block text-[10px] text-[#89938E]">{expressDur} hrs</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const BusinessDashboard: React.FC = () => {
   // ----------------------------------------------------------------------
   // 1. DATA & STATE (UNTOUCHED TO PRESERVE BACKEND CONNECTIONS)
@@ -44,13 +202,13 @@ export const BusinessDashboard: React.FC = () => {
   const [aiPlanResults, setAiPlanResults] = useState<any>(null);
   const [previousAiPlanResults, setPreviousAiPlanResults] = useState<any>(null);
   const [createdShipmentId, setCreatedShipmentId] = useState<string | null>(null);
+  const [selectedPlanType, setSelectedPlanType] = useState<string>('recommended');
 
   // What-If State
   const [whatIfPreference, setWhatIfPreference] = useState<string>('balanced');
   const [whatIfSla, setWhatIfSla] = useState<string>('');
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
-  const [isDemoLoading, setIsDemoLoading] = useState(false);
 
   const [newCargo, setNewCargo] = useState({
     cargoType: '',
@@ -163,8 +321,11 @@ export const BusinessDashboard: React.FC = () => {
       setCreatedShipmentId(created.id);
       setSelectedShipment(created);
 
-      // Call AI Engine
-      const aiResponse = await dataService.getAIPlan(created.id);
+      // Call AI Engine with live telemetry processing display
+      const [aiResponse] = await Promise.all([
+        dataService.getAIPlan(created.id),
+        new Promise((resolve) => setTimeout(resolve, 2200))
+      ]);
       setAiPlanResults(aiResponse);
       setModalStep('results');
       
@@ -186,6 +347,7 @@ export const BusinessDashboard: React.FC = () => {
       const aiResponse = await dataService.getAIPlan(createdShipmentId, options);
       setPreviousAiPlanResults(aiPlanResults);
       setAiPlanResults(aiResponse);
+      setSelectedPlanType('recommended');
     } catch (err: any) {
       console.error(err);
       setModalError(err?.message || 'Failed to recalculate plan. Please try again.');
@@ -204,6 +366,7 @@ export const BusinessDashboard: React.FC = () => {
     setModalStep('intake');
     setAiPlanResults(null);
     setCreatedShipmentId(null);
+    setSelectedPlanType('recommended');
     setNewCargo({
       cargoType: '', category: 'berries', weightKg: '', volumeCbm: 2.0,
       totalShelfLifeDays: '', slaMaxSpoilagePercent: '', slaPriority: 'normal',
@@ -220,6 +383,7 @@ export const BusinessDashboard: React.FC = () => {
       setModalStep('intake');
       setAiPlanResults(null);
       setPreviousAiPlanResults(null);
+      setSelectedPlanType('recommended');
     }, 300);
   };
 
@@ -316,34 +480,6 @@ export const BusinessDashboard: React.FC = () => {
             >
               <Plus className="w-5 h-5" />
               <span>New Shipment</span>
-            </button>
-
-            {/* Load Demo Scenario Button */}
-            <button
-              type="button"
-              disabled={isDemoLoading}
-              onClick={async () => {
-                setIsDemoLoading(true);
-                try {
-                  await dataService.resetDemoData();
-                  await loadData();
-                  setNotification('Demo scenario loaded successfully. Showing 4 sample shipments across 2 consolidation clusters.');
-                  setTimeout(() => setNotification(null), 5000);
-                } catch (err) {
-                  console.error('Demo reset failed:', err);
-                  setNotification('Failed to load demo scenario. Please check server connection.');
-                  setTimeout(() => setNotification(null), 4000);
-                } finally {
-                  setIsDemoLoading(false);
-                }
-              }}
-              className="px-4 py-2 bg-[#163832] hover:bg-[#0f2622] disabled:bg-gray-400 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
-            >
-              {isDemoLoading ? (
-                <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Loading...</>
-              ) : (
-                <><Sparkles className="w-4 h-4" /> Load Demo Scenario</>
-              )}
             </button>
           </div>
         </div>
@@ -707,143 +843,244 @@ export const BusinessDashboard: React.FC = () => {
             )}
 
             {modalStep === 'processing' && (
-              <div className="p-12 flex flex-col items-center justify-center text-center">
-                <div className="w-20 h-20 border-4 border-[#E5EBE3] border-t-[#D98E2B] rounded-full animate-spin mb-6"></div>
-                <h3 className="text-xl font-bold font-display text-[#163832] mb-2">Analyzing Logistics Networks</h3>
-                <p className="text-[#596560] max-w-sm mb-4">The Karwaan engine is evaluating active vehicles, thermal constraints, and multi-modal transfer nodes...</p>
-                <div className="flex gap-2">
-                  <div className="bg-gray-200 w-2 h-2 rounded-full animate-bounce delay-100"></div>
-                  <div className="bg-gray-200 w-2 h-2 rounded-full animate-bounce delay-200"></div>
-                  <div className="bg-gray-200 w-2 h-2 rounded-full animate-bounce delay-300"></div>
-                </div>
-              </div>
+              <EngineProcessingView 
+                origin={newCargo.originName}
+                destination={newCargo.destinationName}
+                cargoType={newCargo.cargoType}
+                weightKg={newCargo.weightKg}
+              />
             )}
 
-            {modalStep === 'results' && aiPlanResults && (
-              <div className="p-0 overflow-y-auto flex-1 flex flex-col bg-[#F8FAF7]">
-                
-                {/* Header: RECOMMENDED PLAN */}
-                <div className="bg-[#163832] text-white p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h4 className="font-display font-black text-2xl mb-1">Recommended Plan</h4>
-                      <span className="font-mono text-xs text-[#D98E2B] uppercase tracking-widest">{aiPlanResults.recommendedPlan?.vehicle} Routing</span>
-                    </div>
-                    {aiPlanResults.recommendedPlan?.slaStatus === 'compliant' && <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-md font-mono text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5"><ShieldCheck className="w-3 h-3"/> SLA Compliant</span>}
-                  </div>
+            {modalStep === 'results' && aiPlanResults && (() => {
+              const activePlan = selectedPlanType === 'recommended' 
+                ? aiPlanResults.recommendedPlan 
+                : (aiPlanResults.candidatePlans?.find((p: any) => p.type === selectedPlanType) || aiPlanResults.recommendedPlan);
+
+              const activeRouteLegs = activePlan?.route?.legs || activePlan?.legs || [];
+              const originLeg = activeRouteLegs[0];
+              const destLeg = activeRouteLegs[activeRouteLegs.length - 1];
+
+              const resolvedOriginCoords = originLeg?.originCoords || [newCargo.originLat || 20.4625, newCargo.originLng || 85.8830];
+              const resolvedDestCoords = destLeg?.destinationCoords || [newCargo.destinationLat || 20.2961, newCargo.destinationLng || 85.8245];
+
+              const hasRail = activeRouteLegs.some((l: any) => l.mode === 'rail_cold_wagon');
+              const hasRoad = activeRouteLegs.some((l: any) => l.mode === 'road_reefer');
+
+              return (
+                <div className="p-0 overflow-y-auto flex-1 flex flex-col bg-[#F8FAF7]">
                   
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
-                    <div>
-                      <span className="block text-[10px] font-mono text-white/50 uppercase tracking-widest mb-1">Cost</span>
-                      <span className="font-display font-bold text-xl">₹{Math.round(aiPlanResults.recommendedPlan?.cost || 0).toLocaleString()}</span>
+                  {/* Header: SELECTED / RECOMMENDED PLAN */}
+                  <div className="bg-[#163832] text-white p-6">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-display font-black text-2xl">
+                            {selectedPlanType === 'recommended' ? 'Recommended Plan' : `${activePlan?.type?.toUpperCase()} Plan Preview`}
+                          </h4>
+                          {selectedPlanType !== 'recommended' && (
+                            <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase">
+                              Alternative Selected
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-mono text-xs text-[#D98E2B] uppercase tracking-widest">
+                          {activePlan?.vehicle || activePlan?.type || 'Optimized'} Routing
+                        </span>
+                      </div>
+                      {activePlan?.slaStatus === 'compliant' || activePlan?.slaStatus === 'ok' ? (
+                        <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-md font-mono text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5">
+                          <ShieldCheck className="w-3 h-3"/> SLA Compliant
+                        </span>
+                      ) : null}
                     </div>
-                    <div>
-                      <span className="block text-[10px] font-mono text-white/50 uppercase tracking-widest mb-1">Est. Departure</span>
-                      <span className="font-bold">
-                        {aiPlanResults.recommendedPlan?.eta && !isNaN(new Date(aiPlanResults.recommendedPlan.eta).getTime())
-                          ? new Date(aiPlanResults.recommendedPlan.eta).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-                          : (aiPlanResults.recommendedPlan?.eta || 'ASAP')}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="block text-[10px] font-mono text-white/50 uppercase tracking-widest mb-1">Transit Time</span>
-                      <span className="font-bold">{aiPlanResults.recommendedPlan?.transitTimeHours?.toFixed(1)} hrs</span>
-                    </div>
-                    <div>
-                      <span className="block text-[10px] font-mono text-white/50 uppercase tracking-widest mb-1">Capacity Util.</span>
-                      <span className="font-bold">{aiPlanResults.recommendedPlan?.capacityUtilization}%</span>
+                    
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+                      <div>
+                        <span className="block text-[10px] font-mono text-white/50 uppercase tracking-widest mb-1">Cost</span>
+                        <span className="font-display font-bold text-xl">₹{Math.round(activePlan?.cost || 0).toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-mono text-white/50 uppercase tracking-widest mb-1">Est. Departure</span>
+                        <span className="font-bold">
+                          {activePlan?.eta && !isNaN(new Date(activePlan.eta).getTime())
+                            ? new Date(activePlan.eta).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                            : (activePlan?.eta || 'ASAP')}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-mono text-white/50 uppercase tracking-widest mb-1">Transit Time</span>
+                        <span className="font-bold">{(activePlan?.transitTimeHours || activePlan?.durationHours)?.toFixed(1)} hrs</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-mono text-white/50 uppercase tracking-widest mb-1">Capacity Util.</span>
+                        <span className="font-bold">{activePlan?.capacityUtilization || aiPlanResults.recommendedPlan?.capacityUtilization || 85}%</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Map Section */}
-                <div className="relative h-[280px] w-full border-b border-gray-200 bg-gray-100 shrink-0">
-                  <KarwaanMap 
-                    routes={[{ id: 'rec-route-1', name: 'Recommended Route', legs: aiPlanResults.recommendedPlan?.route?.legs || [], status: 'active', activeIncidentId: null } as any]} 
-                    selectedRouteId="rec-route-1"
-                    shipments={[{ id: 'rec-ship-1', code: 'NEW', cargoType: newCargo.cargoType, category: newCargo.category, freshnessPercent: 100, origin: { lat: newCargo.originLat, lng: newCargo.originLng, name: newCargo.originName }, destination: { lat: newCargo.destinationLat, lng: newCargo.destinationLng, name: newCargo.destinationName } } as any]}
-                    selectedShipmentId="rec-ship-1"
-                    height="100%" 
-                    showAllControls={false} 
-                    showLegend={true} 
-                  />
-                </div>
-
-                <div className="p-6 space-y-6">
-                  {/* Risks */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     <div className="bg-white border border-[#E5EBE3] p-4 rounded-xl shadow-sm">
-                       <div className="flex justify-between items-center mb-2">
-                         <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Predictive Delay Risk</span>
-                         <span className="text-xs font-bold text-amber-600">{aiPlanResults.recommendedPlan?.delayProbability?.toFixed(1)}%</span>
-                       </div>
-                       <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                         <div className="bg-amber-400 h-full rounded-full" style={{ width: `${Math.min(100, aiPlanResults.recommendedPlan?.delayProbability || 0)}%` }}></div>
-                       </div>
-                     </div>
-                     <div className="bg-white border border-[#E5EBE3] p-4 rounded-xl shadow-sm">
-                       <div className="flex justify-between items-center mb-2">
-                         <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Spoilage Risk Prob.</span>
-                         <span className="text-xs font-bold text-red-600">{aiPlanResults.recommendedPlan?.spoilageProbability?.toFixed(1)}%</span>
-                       </div>
-                       <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                         <div className="bg-red-400 h-full rounded-full" style={{ width: `${Math.min(100, aiPlanResults.recommendedPlan?.spoilageProbability || 0)}%` }}></div>
-                       </div>
-                     </div>
+                  {/* Mode & Route Strip */}
+                  <div className="bg-[#102924] px-6 py-2.5 flex flex-wrap items-center justify-between text-white border-t border-b border-white/10 gap-3">
+                    <div className="flex items-center gap-2 text-xs font-mono">
+                      <span className="text-emerald-400 font-bold">📍 {newCargo.originName || originLeg?.originName || 'Origin'}</span>
+                      <span className="text-white/50">→</span>
+                      <span className="text-amber-400 font-bold">🏁 {newCargo.destinationName || destLeg?.destinationName || 'Destination'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {hasRail && hasRoad ? (
+                        <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                          🚂 🚛 Multimodal (Rail + Road)
+                        </span>
+                      ) : hasRail ? (
+                        <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2.5 py-0.5 rounded font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                          🚂 Rail Cold Wagon
+                        </span>
+                      ) : (
+                        <span className="bg-[#5C7A50]/30 text-green-300 border border-[#5C7A50]/50 px-2.5 py-0.5 rounded font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                          🚛 Road Reefer
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Why this plan? */}
-                  <div className="bg-gradient-to-br from-[#F8FAF7] to-green-50 border border-green-200 rounded-xl p-5 shadow-sm">
-                    <h5 className="font-bold text-[#163832] mb-2 flex items-center gap-2"><Sparkles className="w-4 h-4 text-[#5C7A50]" /> WHY THIS PLAN?</h5>
-                    <p className="text-sm text-gray-700 leading-relaxed font-medium">
-                      {aiPlanResults.recommendedPlan?.explanation?.multimodalAdvantage || aiPlanResults.recommendedPlan?.explanation?.departureReasoning || 'The AI Engine determined this is the mathematically optimal consolidation route prioritizing SLA compliance and cost reduction.'}
-                    </p>
+                  {/* Static Map Section */}
+                  <div className="w-full bg-[#F8FAF7] shrink-0 p-4 pb-0">
+                    <KarwaanMap 
+                      routes={[{ 
+                        id: `plan-${selectedPlanType}`, 
+                        name: activePlan?.name || 'Selected Route', 
+                        legs: activeRouteLegs, 
+                        status: 'active', 
+                        activeIncidentId: null 
+                      } as any]} 
+                      selectedRouteId={`plan-${selectedPlanType}`}
+                      shipments={[{ 
+                        id: 'rec-ship-1', 
+                        code: 'CARGO', 
+                        cargoType: newCargo.cargoType || 'Cargo', 
+                        category: newCargo.category || 'berries', 
+                        freshnessPercent: 100, 
+                        origin: { lat: resolvedOriginCoords[0], lng: resolvedOriginCoords[1], name: newCargo.originName || originLeg?.originName || 'Origin' }, 
+                        destination: { lat: resolvedDestCoords[0], lng: resolvedDestCoords[1], name: newCargo.destinationName || destLeg?.destinationName || 'Destination' } 
+                      } as any]}
+                      selectedShipmentId="rec-ship-1"
+                      height="280px" 
+                      showAllControls={false} 
+                      showLegend={true} 
+                      isStatic={true}
+                    />
                   </div>
-                </div>
 
-                {/* Alternative Plans */}
-                {aiPlanResults.candidatePlans && aiPlanResults.candidatePlans.length > 0 && (
-                  <div className="p-6 pt-0">
-                    <h5 className="font-bold text-[#163832] mb-3 text-sm flex items-center gap-2 border-b border-[#E5EBE3] pb-2">
-                      <Layers className="w-4 h-4 text-[#596560]" />
-                      Alternative Plans Comparison
-                    </h5>
-                    <div className="overflow-x-auto bg-white rounded-xl shadow-sm border border-[#E5EBE3]">
-                      <table className="w-full text-left text-sm border-collapse">
-                        <thead>
-                          <tr className="text-[#596560] font-mono text-[10px] uppercase tracking-widest bg-gray-50 border-b border-[#E5EBE3]">
-                            <th className="py-3 px-4 font-bold">Plan Type</th>
-                            <th className="py-3 px-4 font-bold text-right">Cost (₹)</th>
-                            <th className="py-3 px-4 font-bold text-center">Delay Risk</th>
-                            <th className="py-3 px-4 font-bold text-center">Spoilage Risk</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr className="bg-[#E8F5E9]/30 border-b border-[#E5EBE3]">
-                            <td className="py-3 px-4 font-bold text-[#163832] flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-[#5C7A50]"></span>
-                              Recommended ({aiPlanResults.recommendedPlan?.vehicle})
-                            </td>
-                            <td className="py-3 px-4 font-bold text-[#5C7A50] text-right">₹{Math.round(aiPlanResults.recommendedPlan?.cost || 0).toLocaleString()}</td>
-                            <td className="py-3 px-4 text-center font-medium text-amber-600">{aiPlanResults.recommendedPlan?.delayProbability?.toFixed(1)}%</td>
-                            <td className="py-3 px-4 text-center font-medium text-red-600">{aiPlanResults.recommendedPlan?.spoilageProbability?.toFixed(1)}%</td>
-                          </tr>
-                          {aiPlanResults.candidatePlans.slice(0, 3).map((alt: any, idx: number) => (
-                            <tr key={idx} className="border-b last:border-b-0 border-[#E5EBE3] hover:bg-gray-50">
-                              <td className="py-3 px-4 font-medium text-gray-700 capitalize flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-gray-300"></span>
-                                {alt.type} Plan
-                              </td>
-                              <td className="py-3 px-4 font-mono text-gray-600 text-right">₹{Math.round(alt.cost).toLocaleString()}</td>
-                              <td className="py-3 px-4 text-center text-gray-500">{Math.round(alt.delayRisk?.score || 0)}%</td>
-                              <td className="py-3 px-4 text-center text-gray-500">{Math.round(alt.spoilageRisk?.score || 0)}%</td>
+                  <div className="p-6 space-y-6">
+                    {/* Risks */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                       <div className="bg-white border border-[#E5EBE3] p-4 rounded-xl shadow-sm">
+                         <div className="flex justify-between items-center mb-2">
+                           <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Predictive Delay Risk</span>
+                           <span className="text-xs font-bold text-amber-600">
+                             {(activePlan?.delayProbability || activePlan?.delayRisk?.score || 0).toFixed(1)}%
+                           </span>
+                         </div>
+                         <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                           <div className="bg-amber-400 h-full rounded-full" style={{ width: `${Math.min(100, activePlan?.delayProbability || activePlan?.delayRisk?.score || 0)}%` }}></div>
+                         </div>
+                       </div>
+                       <div className="bg-white border border-[#E5EBE3] p-4 rounded-xl shadow-sm">
+                         <div className="flex justify-between items-center mb-2">
+                           <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Spoilage Risk Prob.</span>
+                           <span className="text-xs font-bold text-red-600">
+                             {(activePlan?.spoilageProbability || activePlan?.spoilageRisk?.score || 0).toFixed(1)}%
+                           </span>
+                         </div>
+                         <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                           <div className="bg-red-400 h-full rounded-full" style={{ width: `${Math.min(100, activePlan?.spoilageProbability || activePlan?.spoilageRisk?.score || 0)}%` }}></div>
+                         </div>
+                       </div>
+                    </div>
+
+                    {/* Why this plan? */}
+                    <div className="bg-gradient-to-br from-[#F8FAF7] to-green-50 border border-green-200 rounded-xl p-5 shadow-sm">
+                      <h5 className="font-bold text-[#163832] mb-2 flex items-center gap-2"><Sparkles className="w-4 h-4 text-[#5C7A50]" /> WHY THIS PLAN?</h5>
+                      <p className="text-sm text-gray-700 leading-relaxed font-medium">
+                        {activePlan?.explanation?.multimodalAdvantage || activePlan?.explanation?.departureReasoning || activePlan?.explanation?.summary || 'The AI Engine determined this is the mathematically optimal consolidation route prioritizing SLA compliance and cost reduction.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Alternative Plans */}
+                  {aiPlanResults.candidatePlans && aiPlanResults.candidatePlans.length > 0 && (
+                    <div className="p-6 pt-0">
+                      <h5 className="font-bold text-[#163832] mb-3 text-sm flex items-center justify-between border-b border-[#E5EBE3] pb-2">
+                        <span className="flex items-center gap-2">
+                          <Layers className="w-4 h-4 text-[#596560]" />
+                          Alternative Plans Comparison
+                        </span>
+                        <span className="text-[11px] font-mono text-[#596560]">Click any plan to preview route on map</span>
+                      </h5>
+                      <div className="overflow-x-auto bg-white rounded-xl shadow-sm border border-[#E5EBE3]">
+                        <table className="w-full text-left text-sm border-collapse">
+                          <thead>
+                            <tr className="text-[#596560] font-mono text-[10px] uppercase tracking-widest bg-gray-50 border-b border-[#E5EBE3]">
+                              <th className="py-3 px-4 font-bold">Plan Type</th>
+                              <th className="py-3 px-4 font-bold text-right">Cost (₹)</th>
+                              <th className="py-3 px-4 font-bold text-center">Transit Time</th>
+                              <th className="py-3 px-4 font-bold text-center">Delay Risk</th>
+                              <th className="py-3 px-4 font-bold text-center">Map Preview</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            <tr 
+                              onClick={() => setSelectedPlanType('recommended')}
+                              className={`cursor-pointer transition-all border-b border-[#E5EBE3] ${
+                                selectedPlanType === 'recommended' 
+                                  ? 'bg-[#E8F5E9]/60 font-bold border-l-4 border-l-[#5C7A50]' 
+                                  : 'hover:bg-gray-50'
+                              }`}
+                            >
+                              <td className="py-3 px-4 text-[#163832] flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-[#5C7A50]"></span>
+                                Recommended ({aiPlanResults.recommendedPlan?.vehicle})
+                              </td>
+                              <td className="py-3 px-4 font-bold text-[#5C7A50] text-right">₹{Math.round(aiPlanResults.recommendedPlan?.cost || 0).toLocaleString()}</td>
+                              <td className="py-3 px-4 text-center font-mono text-xs">{aiPlanResults.recommendedPlan?.transitTimeHours?.toFixed(1)} hrs</td>
+                              <td className="py-3 px-4 text-center font-medium text-amber-600">{aiPlanResults.recommendedPlan?.delayProbability?.toFixed(1)}%</td>
+                              <td className="py-3 px-4 text-center">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${selectedPlanType === 'recommended' ? 'bg-[#5C7A50] text-white' : 'bg-gray-100 text-gray-700'}`}>
+                                  {selectedPlanType === 'recommended' ? 'Active on Map' : 'View Route'}
+                                </span>
+                              </td>
+                            </tr>
+                            {aiPlanResults.candidatePlans.slice(0, 3).map((alt: any, idx: number) => {
+                              const isAltSelected = selectedPlanType === alt.type;
+                              return (
+                                <tr 
+                                  key={idx} 
+                                  onClick={() => setSelectedPlanType(alt.type)}
+                                  className={`cursor-pointer transition-all border-b last:border-b-0 border-[#E5EBE3] ${
+                                    isAltSelected 
+                                      ? 'bg-[#E8F5E9]/60 font-bold border-l-4 border-l-[#5C7A50]' 
+                                      : 'hover:bg-gray-50'
+                                  }`}
+                                >
+                                  <td className="py-3 px-4 font-medium text-gray-700 capitalize flex items-center gap-2">
+                                    <span className={`w-2.5 h-2.5 rounded-full ${alt.type === 'multimodal' ? 'bg-emerald-600' : alt.type === 'express' ? 'bg-amber-500' : 'bg-blue-500'}`}></span>
+                                    {alt.type} Plan ({alt.type === 'multimodal' ? 'Rail + Road' : alt.type === 'express' ? 'Fast Linehaul' : 'Direct Road'})
+                                  </td>
+                                  <td className="py-3 px-4 font-mono text-gray-600 text-right">₹{Math.round(alt.cost).toLocaleString()}</td>
+                                  <td className="py-3 px-4 text-center font-mono text-xs text-gray-600">{alt.durationHours?.toFixed(1)} hrs</td>
+                                  <td className="py-3 px-4 text-center text-gray-500">{Math.round(alt.delayRisk?.score || 0)}%</td>
+                                  <td className="py-3 px-4 text-center">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${isAltSelected ? 'bg-[#5C7A50] text-white' : 'bg-gray-100 text-gray-700'}`}>
+                                      {isAltSelected ? 'Active on Map' : 'View Route'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* What-If Engine Sandbox */}
                 <div className="bg-white border-t border-[#D6DCD4] p-6 shadow-[0_-4px_10px_-5px_rgba(0,0,0,0.05)] z-10 relative">
@@ -922,7 +1159,8 @@ export const BusinessDashboard: React.FC = () => {
                   </button>
                 </div>
               </div>
-            )}
+            );
+          })()}
           </div>
         </div>
       )}

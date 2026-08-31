@@ -2058,22 +2058,6 @@ class DataService {
       this.notify();
     }
   }
-
-  public resetDemoData() {
-    this.businesses = [...INITIAL_BUSINESSES];
-    this.users = [...INITIAL_USERS];
-    this.shipments = [...INITIAL_SHIPMENTS];
-    this.clusters = [...INITIAL_CLUSTERS];
-    this.routes = [...INITIAL_ROUTES];
-    this.incidents = [...INITIAL_INCIDENTS];
-    this.activeUser = this.users[0];
-    localStorage.removeItem('karwaan_shipments');
-    localStorage.removeItem('karwaan_clusters');
-    localStorage.removeItem('karwaan_routes');
-    localStorage.removeItem('karwaan_incidents');
-    localStorage.removeItem('karwaan_active_user');
-    this.notify();
-  }
 }
 
 export const dataService = new DataService();

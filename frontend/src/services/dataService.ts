@@ -178,15 +178,6 @@ class DataService {
     };
     return apiClient.post('/recommendations/plan', payload);
   }
-
-  public async resetDemoData(): Promise<void> {
-    try {
-      await apiClient.post('/demo/reset');
-    } catch (err) {
-      console.error('Failed to reset demo data:', err);
-      throw err;
-    }
-  }
 }
 
 export const dataService = new DataService();

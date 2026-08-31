@@ -120,3 +120,21 @@ export const incidentReports = pgTable('incident_reports', {
   status: varchar('status', { length: 50 }).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
+export const vehicleAvailability = pgTable('vehicle_availability', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  vehicleId: varchar('vehicle_id', { length: 255 }).references(() => vehicles.id).notNull(),
+  date: text('date').notNull(),
+  vehicleType: text('vehicle_type').notNull(),
+  capacityKg: integer('capacity_kg').notNull(),
+  minTempC: integer('min_temp_c').notNull(),
+  maxTempC: integer('max_temp_c').notNull(),
+  homeLocation: text('home_location').notNull(),
+  currentLocation: text('current_location').notNull(),
+  availabilityStatus: varchar('availability_status', { length: 50 }).notNull(),
+  availableFrom: text('available_from'),
+  availableUntil: text('available_until'),
+  estimatedCostPerKm: real('estimated_cost_per_km'),
+  maintenanceStatus: varchar('maintenance_status', { length: 50 }),
+  utilizationRate: real('utilization_rate'),
+});

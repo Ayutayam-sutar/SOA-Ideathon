@@ -1,5 +1,9 @@
 import { db } from './index';
-import { users, businesses, shipments, consolidationClusters, clusterShipments, deliveryRoutes, routeLegs, incidentReports, hubs, vehicles } from './schema';
+import {
+  users, businesses, shipments, consolidationClusters, clusterShipments,
+  deliveryRoutes, routeLegs, incidentReports, hubs, vehicles,
+  vehicleAvailability, temperatureLogEntries
+} from './schema';
 import * as fs from 'fs';
 import * as path from 'path';
 import { parse } from 'csv-parse/sync';
@@ -21,26 +25,54 @@ function readCsv(filename: string) {
   }
 }
 
+/** Insert rows in batches to avoid query-size limits on Neon */
+async function batchInsert(table: any, rows: any[], batchSize = 500, label = '') {
+  let inserted = 0;
+  for (let i = 0; i < rows.length; i += batchSize) {
+    const batch = rows.slice(i, i + batchSize);
+    await db.insert(table).values(batch).onConflictDoNothing();
+    inserted += batch.length;
+    if (label) {
+      process.stdout.write(`\r   ${label}: ${inserted}/${rows.length}`);
+    }
+  }
+  if (label) console.log(); // newline after progress
+  return inserted;
+}
+
+/** Map CSV route mode values to the schema's route_mode enum */
+function mapRouteMode(csvMode: string): 'road_reefer' | 'rail_cold_wagon' | 'hub_transfer' | 'local_transport' {
+  switch (csvMode.toLowerCase().trim()) {
+    case 'road': return 'road_reefer';
+    case 'rail': return 'rail_cold_wagon';
+    case 'local': return 'local_transport';
+    case 'hub': return 'hub_transfer';
+    default: return 'road_reefer';
+  }
+}
+
 async function seed() {
   console.log('🌱 Seeding database...');
 
   try {
-    // 1. Seed Businesses
+    // ── 1. Seed Businesses (hardcoded) ──────────────────────────────────
     await db.insert(businesses).values([
       { id: 'BIZ-01', name: 'Sahyadri Agro Farms', contactInfo: 'contact@sahyadri.in' },
       { id: 'BIZ-02', name: 'Konkan Coast Orchards', contactInfo: 'export@konkanorchards.com' },
       { id: 'BIZ-03', name: 'Nashik Valley Greens & Grapes', contactInfo: 'logistics@nashikvalley.in' },
       { id: 'BIZ-04', name: 'Deccan Highlands Dairy & Fungi', contactInfo: 'supply@deccandairy.com' },
     ]).onConflictDoNothing();
+    console.log('✅ Seeded 4 businesses.');
 
-    // 2. Seed Users
+    // ── 2. Seed Users (hardcoded) ───────────────────────────────────────
     await db.insert(users).values([
       { id: 'USR-ADMIN-01', email: 'admin@karwaan.in', passwordHash: '$2b$10$kTCEHO1NFipwfDr9yhxqZOZe8vCoZbvtE1lB3N4USvVuNfub30MVG', role: 'admin' },
       { id: 'USR-BIZ-01', email: 'logistics@sahyadri.in', passwordHash: '$2b$10$kTCEHO1NFipwfDr9yhxqZOZe8vCoZbvtE1lB3N4USvVuNfub30MVG', role: 'business', businessId: 'BIZ-01' },
       { id: 'USR-AGENT-01', email: 'agent1@karwaan.in', passwordHash: '$2b$10$kTCEHO1NFipwfDr9yhxqZOZe8vCoZbvtE1lB3N4USvVuNfub30MVG', role: 'agent' },
     ]).onConflictDoNothing();
+    console.log('✅ Seeded 3 users.');
 
-    // 3. Seed Consolidation Clusters
+    // ── 3. Seed Consolidation Clusters (hardcoded) ──────────────────────
     await db.insert(consolidationClusters).values([
       { id: 'CLST-OD-01', costSavingsPercent: 25, co2SavedKg: 85.0, status: 'in_transit' },
       { id: 'CLST-OD-02', costSavingsPercent: 30, co2SavedKg: 120.0, status: 'in_transit' },
@@ -54,63 +86,14 @@ async function seed() {
       { id: 'CLST-KOL-02', costSavingsPercent: 15, co2SavedKg: 30.0, status: 'in_transit' },
       { id: 'CLST-KOL-03', costSavingsPercent: 32, co2SavedKg: 140.0, status: 'in_transit' },
     ]).onConflictDoNothing();
+    console.log('✅ Seeded 11 consolidation clusters.');
 
-    // 4. Seed Delivery Routes
-    await db.insert(deliveryRoutes).values([
-      { id: 'RT-OD-01', clusterId: 'CLST-OD-01', status: 'in_transit', totalCost: 15000 },
-      { id: 'RT-OD-02', clusterId: 'CLST-OD-02', status: 'in_transit', totalCost: 28000 },
-      { id: 'RT-OD-03', clusterId: 'CLST-OD-03', status: 'in_transit', totalCost: 8000 },
-      { id: 'RT-OD-04', clusterId: 'CLST-OD-04', status: 'in_transit', totalCost: 25000 },
-      { id: 'RT-OD-05', clusterId: 'CLST-OD-05', status: 'in_transit', totalCost: 18000 },
-      { id: 'RT-OD-07', clusterId: 'CLST-OD-07', status: 'in_transit', totalCost: 22000 },
-      { id: 'RT-OD-08', clusterId: 'CLST-OD-08', status: 'in_transit', totalCost: 65000 },
-      { id: 'RT-OD-10', clusterId: 'CLST-OD-10', status: 'in_transit', totalCost: 19000 },
-      { id: 'RT-KOL-01', clusterId: 'CLST-KOL-01', status: 'in_transit', totalCost: 12000 },
-      { id: 'RT-KOL-02', clusterId: 'CLST-KOL-02', status: 'in_transit', totalCost: 5000 },
-      { id: 'RT-KOL-03', clusterId: 'CLST-KOL-03', status: 'in_transit', totalCost: 20000 },
-    ]).onConflictDoNothing();
+    // ═══════════════════════════════════════════════════════════════════
+    //  CSV-Driven Seeding
+    // ═══════════════════════════════════════════════════════════════════
+    console.log('\n📦 Parsing CSV datasets...');
 
-    // 5. Seed Route Legs
-    await db.insert(routeLegs).values([
-      { id: 'LEG-OD-01-1', routeId: 'RT-OD-01', sequence: 1, mode: 'rail_cold_wagon', origin: 'Bhubaneswar Wholesale Terminal', destination: 'Cuttack', reliabilityScore: 97, onTimePercent: 95, avgDelayMinutes: 5 },
-      { id: 'LEG-OD-01-2', routeId: 'RT-OD-01', sequence: 2, mode: 'rail_cold_wagon', origin: 'Cuttack', destination: 'Jajpur', reliabilityScore: 96, onTimePercent: 94, avgDelayMinutes: 6 },
-      { id: 'LEG-OD-01-3', routeId: 'RT-OD-01', sequence: 3, mode: 'rail_cold_wagon', origin: 'Jajpur', destination: 'Bhadrak', reliabilityScore: 96, onTimePercent: 94, avgDelayMinutes: 6 },
-      { id: 'LEG-OD-01-4', routeId: 'RT-OD-01', sequence: 4, mode: 'rail_cold_wagon', origin: 'Bhadrak', destination: 'Baleswar', reliabilityScore: 95, onTimePercent: 92, avgDelayMinutes: 8 },
-      { id: 'LEG-OD-01-5', routeId: 'RT-OD-01', sequence: 5, mode: 'road_reefer', origin: 'Baleswar', destination: 'Baripada', reliabilityScore: 92, onTimePercent: 90, avgDelayMinutes: 12 },
-      { id: 'LEG-OD-02-1', routeId: 'RT-OD-02', sequence: 1, mode: 'rail_cold_wagon', origin: 'Bhubaneswar Wholesale Terminal', destination: 'Cuttack', reliabilityScore: 97, onTimePercent: 95, avgDelayMinutes: 5 },
-      { id: 'LEG-OD-02-2', routeId: 'RT-OD-02', sequence: 2, mode: 'rail_cold_wagon', origin: 'Cuttack', destination: 'Jajpur', reliabilityScore: 96, onTimePercent: 94, avgDelayMinutes: 6 },
-      { id: 'LEG-OD-02-3', routeId: 'RT-OD-02', sequence: 3, mode: 'rail_cold_wagon', origin: 'Jajpur', destination: 'Bhadrak', reliabilityScore: 96, onTimePercent: 94, avgDelayMinutes: 6 },
-      { id: 'LEG-OD-02-4', routeId: 'RT-OD-02', sequence: 4, mode: 'rail_cold_wagon', origin: 'Bhadrak', destination: 'Baleswar', reliabilityScore: 95, onTimePercent: 92, avgDelayMinutes: 8 },
-      { id: 'LEG-OD-02-5', routeId: 'RT-OD-02', sequence: 5, mode: 'rail_cold_wagon', origin: 'Baleswar', destination: 'Kolkata', reliabilityScore: 94, onTimePercent: 91, avgDelayMinutes: 10 },
-      { id: 'LEG-OD-03-1', routeId: 'RT-OD-03', sequence: 1, mode: 'rail_cold_wagon', origin: 'Bhubaneswar Wholesale Terminal', destination: 'Puri', reliabilityScore: 98, onTimePercent: 97, avgDelayMinutes: 5 },
-      { id: 'LEG-OD-04-1', routeId: 'RT-OD-04', sequence: 1, mode: 'rail_cold_wagon', origin: 'Bhubaneswar Wholesale Terminal', destination: 'Vizag', reliabilityScore: 94, onTimePercent: 91, avgDelayMinutes: 12 },
-      { id: 'LEG-OD-05-1', routeId: 'RT-OD-05', sequence: 1, mode: 'road_reefer', origin: 'Bhubaneswar Wholesale Terminal', destination: 'Rourkela', reliabilityScore: 91, onTimePercent: 88, avgDelayMinutes: 20 },
-      { id: 'LEG-OD-07-1', routeId: 'RT-OD-07', sequence: 1, mode: 'road_reefer', origin: 'Bhubaneswar Wholesale Terminal', destination: 'Raipur', reliabilityScore: 89, onTimePercent: 86, avgDelayMinutes: 25 },
-      { id: 'LEG-OD-08-01', routeId: 'RT-OD-08', sequence: 1, mode: 'rail_cold_wagon', origin: 'Bhubaneswar Wholesale Terminal', destination: 'Cuttack', reliabilityScore: 97, onTimePercent: 95, avgDelayMinutes: 5 },
-      { id: 'LEG-OD-08-02', routeId: 'RT-OD-08', sequence: 2, mode: 'rail_cold_wagon', origin: 'Cuttack', destination: 'Jajpur', reliabilityScore: 96, onTimePercent: 94, avgDelayMinutes: 6 },
-      { id: 'LEG-OD-08-03', routeId: 'RT-OD-08', sequence: 3, mode: 'rail_cold_wagon', origin: 'Jajpur', destination: 'Bhadrak', reliabilityScore: 96, onTimePercent: 94, avgDelayMinutes: 6 },
-      { id: 'LEG-OD-08-04', routeId: 'RT-OD-08', sequence: 4, mode: 'rail_cold_wagon', origin: 'Bhadrak', destination: 'Baleswar', reliabilityScore: 95, onTimePercent: 92, avgDelayMinutes: 8 },
-      { id: 'LEG-OD-08-05', routeId: 'RT-OD-08', sequence: 5, mode: 'rail_cold_wagon', origin: 'Baleswar', destination: 'Hijli', reliabilityScore: 94, onTimePercent: 91, avgDelayMinutes: 10 },
-      { id: 'LEG-OD-08-06', routeId: 'RT-OD-08', sequence: 6, mode: 'rail_cold_wagon', origin: 'Hijli', destination: 'Tatanagar Junction', reliabilityScore: 93, onTimePercent: 90, avgDelayMinutes: 12 },
-      { id: 'LEG-OD-08-07', routeId: 'RT-OD-08', sequence: 7, mode: 'rail_cold_wagon', origin: 'Tatanagar Junction', destination: 'Muri Junction', reliabilityScore: 94, onTimePercent: 92, avgDelayMinutes: 11 },
-      { id: 'LEG-OD-08-08', routeId: 'RT-OD-08', sequence: 8, mode: 'rail_cold_wagon', origin: 'Muri Junction', destination: 'Bokaro Steel City', reliabilityScore: 95, onTimePercent: 93, avgDelayMinutes: 9 },
-      { id: 'LEG-OD-08-09', routeId: 'RT-OD-08', sequence: 9, mode: 'rail_cold_wagon', origin: 'Bokaro Steel City', destination: 'Gomoh Junction', reliabilityScore: 96, onTimePercent: 94, avgDelayMinutes: 7 },
-      { id: 'LEG-OD-08-10', routeId: 'RT-OD-08', sequence: 10, mode: 'rail_cold_wagon', origin: 'Gomoh Junction', destination: 'Koderma Junction', reliabilityScore: 95, onTimePercent: 93, avgDelayMinutes: 8 },
-      { id: 'LEG-OD-08-11', routeId: 'RT-OD-08', sequence: 11, mode: 'rail_cold_wagon', origin: 'Koderma Junction', destination: 'Gaya Junction', reliabilityScore: 94, onTimePercent: 92, avgDelayMinutes: 10 },
-      { id: 'LEG-OD-08-12', routeId: 'RT-OD-08', sequence: 12, mode: 'rail_cold_wagon', origin: 'Gaya Junction', destination: 'PT. Deen Dayal Upadhyaya Junction', reliabilityScore: 95, onTimePercent: 93, avgDelayMinutes: 9 },
-      { id: 'LEG-OD-08-13', routeId: 'RT-OD-08', sequence: 13, mode: 'rail_cold_wagon', origin: 'PT. Deen Dayal Upadhyaya Junction', destination: 'Prayagraj Junction', reliabilityScore: 93, onTimePercent: 91, avgDelayMinutes: 12 },
-      { id: 'LEG-OD-08-14', routeId: 'RT-OD-08', sequence: 14, mode: 'rail_cold_wagon', origin: 'Prayagraj Junction', destination: 'Kanpur Central', reliabilityScore: 94, onTimePercent: 92, avgDelayMinutes: 11 },
-      { id: 'LEG-OD-08-15', routeId: 'RT-OD-08', sequence: 15, mode: 'rail_cold_wagon', origin: 'Kanpur Central', destination: 'New Delhi', reliabilityScore: 96, onTimePercent: 94, avgDelayMinutes: 8 },
-      { id: 'LEG-OD-10-1', routeId: 'RT-OD-10', sequence: 1, mode: 'road_reefer', origin: 'Bhubaneswar Wholesale Terminal', destination: 'Koraput', reliabilityScore: 90, onTimePercent: 87, avgDelayMinutes: 18 },
-      { id: 'LEG-OD-10-2', routeId: 'RT-OD-10', sequence: 2, mode: 'road_reefer', origin: 'Koraput', destination: 'Malkangiri', reliabilityScore: 88, onTimePercent: 85, avgDelayMinutes: 22 },
-      { id: 'LEG-KOL-01-1', routeId: 'RT-KOL-01', sequence: 1, mode: 'road_reefer', origin: 'Kolkata', destination: 'Dhanbad', reliabilityScore: 91, onTimePercent: 88, avgDelayMinutes: 15 },
-      { id: 'LEG-KOL-02-1', routeId: 'RT-KOL-02', sequence: 1, mode: 'road_reefer', origin: 'Kolkata', destination: 'Diamond Harbour', reliabilityScore: 94, onTimePercent: 92, avgDelayMinutes: 10 },
-      { id: 'LEG-KOL-03-1', routeId: 'RT-KOL-03', sequence: 1, mode: 'rail_cold_wagon', origin: 'Kolkata', destination: 'Patna', reliabilityScore: 93, onTimePercent: 90, avgDelayMinutes: 14 },
-    ]).onConflictDoNothing();
-
-    console.log('📦 Parsing CSV datasets...');
-    
-    // Seed Hubs
+    // ── 4. Seed Hubs from CSV ───────────────────────────────────────────
     const hubsData = readCsv('hubs_clean.csv');
     if (hubsData.length > 0) {
       const hubsToInsert = hubsData.map((row: any) => ({
@@ -131,7 +114,7 @@ async function seed() {
       console.log(`✅ Seeded ${hubsToInsert.length} hubs from CSV.`);
     }
 
-    // Seed Vehicles
+    // ── 5. Seed Vehicles from CSV ───────────────────────────────────────
     const vehiclesData = readCsv('vehicles_clean.csv');
     if (vehiclesData.length > 0) {
       const vehiclesToInsert = vehiclesData.map((row: any) => ({
@@ -150,7 +133,60 @@ async function seed() {
       console.log(`✅ Seeded ${vehiclesToInsert.length} vehicles from CSV.`);
     }
 
-    // Seed Shipments
+    // ── 6. Seed Routes from routes_clean.csv ────────────────────────────
+    //    (replaces old hardcoded deliveryRoutes + routeLegs)
+    const routesData = readCsv('routes_clean.csv');
+    if (routesData.length > 0) {
+      // 6a. Insert delivery routes
+      const routesToInsert = routesData.map((row: any) => ({
+        id: String(row.route_id),
+        status: 'available' as const,
+        totalCost: Number(row.base_cost_inr) || 0,
+      }));
+      await batchInsert(deliveryRoutes, routesToInsert, 500, 'Routes');
+      console.log(`✅ Seeded ${routesToInsert.length} delivery routes from routes_clean.csv.`);
+
+      // 6b. Insert one route leg per route
+      const legsToInsert = routesData.map((row: any) => ({
+        id: `${String(row.route_id)}-L1`,
+        routeId: String(row.route_id),
+        sequence: 1,
+        mode: mapRouteMode(String(row.mode)),
+        origin: String(row.origin),
+        destination: String(row.destination),
+        reliabilityScore: Number(row.reliability) * 100 || 85, // CSV stores as 0-1 fraction
+        onTimePercent: Number(row.reliability) * 100 || 85,
+        avgDelayMinutes: Math.round(((Number(row.avg_transit_hr) || 0) * 60) * (1 - (Number(row.reliability) || 0.85)) ) || 10,
+      }));
+      await batchInsert(routeLegs, legsToInsert, 500, 'Route Legs');
+      console.log(`✅ Seeded ${legsToInsert.length} route legs from routes_clean.csv.`);
+    }
+
+    // ── 7. Seed Vehicle Availability from vehicle_availability_clean.csv ─
+    const vaData = readCsv('vehicle_availability_clean.csv');
+    if (vaData.length > 0) {
+      const vaToInsert = vaData.map((row: any) => ({
+        id: String(row.availability_id),
+        vehicleId: String(row.vehicle_id),
+        date: String(row.date),
+        vehicleType: String(row.vehicle_type),
+        capacityKg: Number(row.capacity_kg),
+        minTempC: Number(row.min_temp_c),
+        maxTempC: Number(row.max_temp_c),
+        homeLocation: String(row.home_location),
+        currentLocation: String(row.current_location),
+        availabilityStatus: String(row.availability_status),
+        availableFrom: String(row.available_from || ''),
+        availableUntil: String(row.available_until || ''),
+        estimatedCostPerKm: Number(row.estimated_cost_per_km) || 0,
+        maintenanceStatus: String(row.maintenance_status || 'good'),
+        utilizationRate: Number(row.utilization_rate) || 0,
+      }));
+      const vaCount = await batchInsert(vehicleAvailability, vaToInsert, 500, 'Vehicle Availability');
+      console.log(`✅ Seeded ${vaCount} vehicle availability records from CSV.`);
+    }
+
+    // ── 8. Seed Current Shipments from current_shipments_clean.csv ──────
     const shipmentsData = readCsv('current_shipments_clean.csv');
     if (shipmentsData.length > 0) {
       const shipmentsToInsert = shipmentsData.map((row: any) => ({
@@ -184,7 +220,50 @@ async function seed() {
       console.log(`✅ Seeded ${shipmentsToInsert.length} current shipments from CSV.`);
     }
 
-    console.log('✅ Database seeded successfully!');
+    // ── 9. Seed Historical Shipments from historical_shipments_clean.csv ─
+    //    (Required: temperature_history_clean.csv references these HS* IDs via FK)
+    const histShipmentsData = readCsv('historical_shipments_clean.csv');
+    if (histShipmentsData.length > 0) {
+      // Ensure a default business exists for historical shipments
+      await db.insert(businesses).values([
+        { id: 'BIZ-HIST', name: 'Historical Import', contactInfo: 'historical@karwaan.in' }
+      ]).onConflictDoNothing();
+
+      const histToInsert = histShipmentsData.map((row: any) => ({
+        id: String(row.shipment_id),
+        businessId: 'BIZ-HIST',
+        cargoType: String(row.product_type),
+        targetTempMin: Number(row.required_min_temp_c),
+        targetTempMax: Number(row.required_max_temp_c),
+        weightKg: Math.round(Number(row.weight_kg)) || 0,
+        origin: String(row.origin),
+        destination: String(row.destination),
+        pickupStartHour: Math.round(Number(row.pickup_hour)) || 0,
+        deliveryDeadlineHr: Math.round(Number(row.delivery_deadline_hr)) || 0,
+        totalShelfLifeHours: 72,
+        remainingShelfLifeHours: 0,  // historical — already delivered
+        freshnessPercent: 0,
+      }));
+      const histCount = await batchInsert(shipments, histToInsert, 500, 'Historical Shipments');
+      console.log(`✅ Seeded ${histCount} historical shipments from CSV.`);
+    }
+
+    // ── 10. Seed Temperature History from temperature_history_clean.csv ──
+    const tempData = readCsv('temperature_history_clean.csv');
+    if (tempData.length > 0) {
+      const baseTime = new Date('2025-01-01T00:00:00Z');
+
+      const tempToInsert = tempData.map((row: any) => ({
+        shipmentId: String(row.shipment_id),
+        timestamp: new Date(baseTime.getTime() + (Number(row.hour_from_departure) || 0) * 3600000),
+        temp: Number(row.temperature_c),
+        location: 'in_transit',
+      }));
+      const tempCount = await batchInsert(temperatureLogEntries, tempToInsert, 500, 'Temperature Logs');
+      console.log(`✅ Seeded ${tempCount} temperature log entries from CSV.`);
+    }
+
+    console.log('\n🎉 Database seeded successfully!');
     process.exit(0);
   } catch (error) {
     console.error('❌ Error seeding database:', error);

@@ -10,7 +10,6 @@ import routesRoutes from './routes/routes';
 import incidentsRoutes from './routes/incidents';
 import recommendationsRoutes from './routes/recommendations';
 import vehiclesRoutes from './routes/vehicles';
-import { resetDemo } from './controllers/demoController';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -32,7 +31,6 @@ app.use('/api/routes', routesRoutes);
 app.use('/api/incidents', incidentsRoutes);
 app.use('/api/recommendations', recommendationsRoutes);
 app.use('/api/vehicles', vehiclesRoutes);
-app.post('/api/demo/reset', resetDemo);
 
 // Error Handling (Must be last)
 app.use(errorHandler);

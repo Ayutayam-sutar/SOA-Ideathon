@@ -15,6 +15,7 @@ interface KarwaanMapProps {
   height?: string;
   showAllControls?: boolean;
   showLegend?: boolean;
+  isStatic?: boolean;
 }
 
 export const KarwaanMap: React.FC<KarwaanMapProps> = ({
@@ -29,6 +30,7 @@ export const KarwaanMap: React.FC<KarwaanMapProps> = ({
   height = '480px',
   showAllControls = true,
   showLegend = true,
+  isStatic = false,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -49,17 +51,23 @@ export const KarwaanMap: React.FC<KarwaanMapProps> = ({
     const map = L.map(mapContainerRef.current, {
       center: [20.5, 84.5],
       zoom: 7,
-      minZoom: 5,
+      minZoom: 4,
       maxZoom: 18,
       maxBounds: indiaBounds,
       maxBoundsViscosity: 1.0,
-      zoomControl: showAllControls,
+      zoomControl: !isStatic && showAllControls,
+      dragging: !isStatic,
+      touchZoom: !isStatic,
+      scrollWheelZoom: !isStatic,
+      doubleClickZoom: !isStatic,
+      boxZoom: !isStatic,
+      keyboard: !isStatic,
       attributionControl: false,
     });
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      subdomains: 'abcd',
+      subdomains: ['a', 'b', 'c'],
     }).addTo(map);
 
     const layerGroup = L.layerGroup().addTo(map);
@@ -71,7 +79,7 @@ export const KarwaanMap: React.FC<KarwaanMapProps> = ({
       mapInstanceRef.current = null;
       layerGroupRef.current = null;
     };
-  }, [showAllControls]);
+  }, [showAllControls, isStatic]);
 
   // Update Layers when data or selection changes
   useEffect(() => {
@@ -88,24 +96,30 @@ export const KarwaanMap: React.FC<KarwaanMapProps> = ({
       : routes;
 
     routesToDraw.forEach((route) => {
-      const isRouteSelected = route.id === selectedRouteId;
+      const isRouteSelected = route.id === selectedRouteId || routesToDraw.length === 1;
 
       route.legs.forEach((leg) => {
-        if (!leg.coordinates || !Array.isArray(leg.coordinates) || leg.coordinates.length === 0) return;
+        let coords = leg.coordinates;
+        if (!coords || !Array.isArray(coords) || coords.length === 0) {
+          if (leg.originCoords && leg.destinationCoords) {
+            coords = [leg.originCoords, leg.destinationCoords];
+          }
+        }
+        if (!coords || !Array.isArray(coords) || coords.length === 0) return;
         
         const isRail = leg.mode === 'rail_cold_wagon';
         
         const color = isRouteSelected
-          ? '#163832'
+          ? (isRail ? '#163832' : '#5C7A50')
           : route.status === 'incident_reported'
           ? '#B3462C'
           : isRail
           ? '#245249'
           : '#5C7A50';
 
-        const polyline = L.polyline(leg.coordinates, {
+        const polyline = L.polyline(coords, {
           color: color,
-          weight: isRouteSelected ? 5 : isRail ? 4.5 : 3.5,
+          weight: isRouteSelected ? 6 : isRail ? 4.5 : 3.5,
           opacity: isRouteSelected ? 0.95 : 0.8,
           dashArray: isRail ? '8, 7' : undefined,
           lineJoin: 'round',
@@ -117,14 +131,14 @@ export const KarwaanMap: React.FC<KarwaanMapProps> = ({
 
         polyline.bindTooltip(
           `<div class="font-mono text-xs p-1">
-            <strong>${isRail ? '🚂 Rail Cold Rake' : '🚛 Road Reefer'}</strong>: ${leg.distanceKm} km<br/>
+            <strong>${isRail ? '🚂 Rail Cold Rake' : '🚛 Road Reefer'}</strong>: ${leg.distanceKm || ''} km<br/>
             ${leg.originName} → ${leg.destinationName}
            </div>`,
           { sticky: true }
         );
 
         polyline.addTo(layerGroup);
-        leg.coordinates.forEach((coord) => bounds.extend(coord));
+        coords.forEach((coord) => bounds.extend(coord));
       });
     });
 
@@ -347,13 +361,28 @@ export const KarwaanMap: React.FC<KarwaanMapProps> = ({
       bounds.extend(hub.coords);
     });
 
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 10 });
-    }
+    const fitMap = () => {
+      map.invalidateSize();
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 10 });
+      }
+    };
+
+    fitMap();
+    const timer1 = setTimeout(fitMap, 100);
+    const timer2 = setTimeout(fitMap, 300);
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
   }, [shipments, clusters, routes, selectedShipmentId, selectedRouteId, selectedClusterId, onSelectShipment, onSelectRoute]);
 
   return (
-    <div className="relative w-full border border-[#D6DCD4] rounded-[6px] overflow-hidden bg-[#FFFFFF] shadow-sm">
+    <div 
+      className="relative w-full border border-[#D6DCD4] rounded-[6px] overflow-hidden bg-[#FFFFFF] shadow-sm"
+      style={{ height, minHeight: height }}
+    >
       {/* Map Legend Overlay */}
       {showLegend && (
         <div className="absolute top-3 right-3 z-[1000] bg-[#FFFFFF]/95 backdrop-blur-md border border-[#D6DCD4] rounded px-3 py-2 text-xs shadow-sm flex flex-col gap-1.5 select-none">
@@ -383,7 +412,7 @@ export const KarwaanMap: React.FC<KarwaanMapProps> = ({
         </div>
       )}
 
-      <div ref={mapContainerRef} style={{ height }} className="w-full z-0" />
+      <div ref={mapContainerRef} style={{ height: '100%', width: '100%', minHeight: '180px' }} className="w-full h-full z-0" />
     </div>
   );
 };
