@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { KarwaanMap } from '../components/KarwaanMap';
 import { MapLegend } from '../components/MapLegend';
@@ -266,6 +267,7 @@ export const BusinessDashboard: React.FC = () => {
   // ----------------------------------------------------------------------
   const { hasAccess } = useAuth();
   const [user, setUser] = useState<User | null>(null);
+  const navigate = useNavigate();
   const [businesses, setBusinesses] = useState<BusinessEntity[]>([]);
   const [currentBizId, setCurrentBizId] = useState<string>('');
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -363,12 +365,9 @@ export const BusinessDashboard: React.FC = () => {
     }
   }, [myShipments, selectedShipment]);
 
-  // Handle Mobile Scrolling to details when a shipment is clicked
+  // Handle navigation to shipment details
   const handleSelectShipment = (shipment: Shipment) => {
-    setSelectedShipment(shipment);
-    if (window.innerWidth < 1024 && detailsPanelRef.current) {
-      detailsPanelRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    navigate(`/business/shipments/${shipment.id}`);
   };
 
   // Aggregate stats
@@ -665,11 +664,11 @@ const confirmAiPlan = async (planId: string) => {
           </div>
         </div>
 
-        {/* Layout Split: Shipments (8 cols) + Selected Details (4 cols) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Consignments List Full Width */}
+        <div className="grid grid-cols-1 gap-8 items-start">
           
           {/* LEFT: Consignments List */}
-          <div className="lg:col-span-8 bg-white border border-[#E5EBE3] rounded-3xl p-1 sm:p-6 shadow-sm">
+          <div className="bg-white border border-[#E5EBE3] rounded-3xl p-1 sm:p-6 shadow-sm">
             <div className="px-4 py-4 sm:px-0 sm:pt-0 sm:pb-5 border-b border-[#E5EBE3] flex items-center justify-between">
               <div>
                 <h3 className="font-display font-bold text-xl text-[#163832]">Manifest</h3>
@@ -767,88 +766,8 @@ const confirmAiPlan = async (planId: string) => {
               </>
             )}
           </div>
-
-          {/* RIGHT: Live Tracking Details (Sticky) */}
-          <div className="lg:col-span-4" ref={detailsPanelRef}>
-            <div className="sticky top-6 space-y-4">
-              {selectedShipment ? (
-                <div className="bg-[#163832] rounded-3xl p-1 shadow-lg overflow-hidden flex flex-col">
-                  {/* Top Dark Header */}
-                  <div className="p-6 text-white">
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="font-mono text-[10px] font-bold text-[#D98E2B] uppercase tracking-widest bg-[#D98E2B]/10 px-2 py-1 rounded">Cold-Chain Status</span>
-                    </div>
-                    <h3 className="font-display font-black text-2xl mb-1">{selectedShipment.code}</h3>
-                    <p className="text-white/70 text-sm font-medium">{selectedShipment.cargoType}</p>
-                    
-                    <div className="mt-6">
-                      <FreshnessGauge percentage={selectedShipment.freshnessPercent} remainingHours={selectedShipment.remainingShelfLifeHours} totalHours={selectedShipment.totalShelfLifeHours} size="lg" showLabel predictedRiskLevel={selectedShipment.spoilageRiskLevel} />
-                    </div>
-                  </div>
-
-                  {/* Bottom Light Section */}
-                  <div className="bg-white rounded-[20px] p-6 flex-1 flex flex-col gap-6">
-                    
-                    {/* AI Consolidation Insight */}
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-100 p-5 rounded-xl relative overflow-hidden">
-                      <Sparkles className="absolute top-2 right-2 w-24 h-24 text-green-500/5 -rotate-12" />
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Sparkles className="w-4 h-4 text-[#5C7A50]" />
-                        <span className="font-bold text-[#163832] text-xs uppercase tracking-widest">AI Logistics Value</span>
-                      </div>
-                      <p className="text-sm text-gray-700 leading-relaxed font-medium relative z-10">
-                        {selectedShipment.consolidationReason || `Grouped with local shipments on the cold corridor. Eradicated deadhead mileage to save ${selectedShipment.costSavingsPercent}%.`}
-                      </p>
-                    </div>
-
-                    {/* Financials */}
-                    <div className="flex items-center justify-between px-2">
-                      <div>
-                        <span className="font-mono text-[10px] text-[#596560] font-bold uppercase tracking-widest block mb-1">Solo Charter</span>
-                        <span className="font-mono text-lg text-gray-400 line-through">₹{selectedShipment.estimatedSoloCostINR.toLocaleString()}</span>
-                      </div>
-                      <ArrowRight className="w-5 h-5 text-gray-300 mx-2" />
-                      <div className="text-right">
-                        <span className="font-mono text-[10px] text-[#5C7A50] font-bold uppercase tracking-widest block mb-1">Karwaan Rate</span>
-                        <span className="font-mono text-2xl font-black text-[#5C7A50]">₹{selectedShipment.consolidatedCostINR.toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    {/* Telemetry Grid */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-[#F8FAF7] border border-[#E5EBE3] p-4 rounded-xl text-center overflow-hidden">
-                        <ThermometerSnowflake className="w-4 h-4 text-[#163832] mx-auto mb-1.5 opacity-50" />
-                        <span className="block text-[10px] font-mono font-bold text-[#596560] uppercase tracking-widest mb-1">Ambient</span>
-                        {/* THE FIX: Added truncate to handle wild data glitches like 23342°C */}
-                        <span className="font-bold text-[#163832] text-lg block truncate max-w-full" title={`${selectedShipment.currentTemp}°C`}>
-                          {selectedShipment.currentTemp}°C
-                        </span>
-                      </div>
-                      <div className="bg-[#F8FAF7] border border-[#E5EBE3] p-4 rounded-xl text-center">
-                        <ShieldCheck className="w-4 h-4 text-[#5C7A50] mx-auto mb-1.5 opacity-50" />
-                        <span className="block text-[10px] font-mono font-bold text-[#596560] uppercase tracking-widest mb-1">Status</span>
-                        <span className="font-bold text-[#5C7A50] text-sm mt-1 block leading-tight">Secured</span>
-                      </div>
-                    </div>
-
-                    {/* Map */}
-                    <div className="border border-[#E5EBE3] rounded-xl overflow-hidden shadow-inner mt-2">
-                      <KarwaanMap shipments={[selectedShipment]} selectedShipmentId={selectedShipment.id} height="160px" showAllControls={false} showLegend={false} />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white border border-[#E5EBE3] rounded-3xl p-10 text-center shadow-sm flex flex-col items-center justify-center h-full min-h-[400px]">
-                  <Layers className="w-12 h-12 text-[#D6DCD4] mb-4" />
-                  <h3 className="font-display font-bold text-lg text-[#163832] mb-2">Inspect Consignment</h3>
-                  <p className="text-[#596560] text-sm leading-relaxed">Select any shipment from your manifest on the left to view deep-dive telematics and AI cost analyses.</p>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       </main>
-
       {/* ---------------------------------------------------------------------- */}
       {/* 4. "NEW SHIPMENT" SMART MODAL */}
       {/* ---------------------------------------------------------------------- */}

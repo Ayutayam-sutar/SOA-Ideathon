@@ -4,7 +4,7 @@ import { shipments, businesses, temperatureLogEntries } from '../db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { riskPredictionService } from '../services/riskPrediction';
 import { maskCommercialData } from '../middleware/fieldMasking';
-import { getShipmentRouteInfo, dynamicLocationsCache, getLocationCoords } from '../services/locationHelper';
+import { getShipmentRouteInfo, dynamicLocationsCache, getLocationCoords, calculateShipmentEconomics } from '../services/locationHelper';
 
 // Seed-data compatibility shims for missing older database fields
 const SEED_DEFAULT_CATEGORY = 'berries';
@@ -41,6 +41,9 @@ export const getShipments = async (req: Request, res: Response, next: NextFuncti
       const logs = await db.select().from(temperatureLogEntries).where(eq(temperatureLogEntries.shipmentId, shipment.id)).orderBy(desc(temperatureLogEntries.timestamp)).limit(20);
       
       const routeInfo = getShipmentRouteInfo(shipment.id, shipment.cargoType, shipment.origin || undefined, shipment.destination || undefined);
+      
+      const weight = shipment.weightKg != null ? shipment.weightKg : SEED_DEFAULT_WEIGHT_KG;
+      const economics = calculateShipmentEconomics(weight, [routeInfo.origin.lat, routeInfo.origin.lng], [routeInfo.destination.lat, routeInfo.destination.lng]);
 
       // Pad to perfectly match the frontend 'Shipment' type
       return {
@@ -48,7 +51,7 @@ export const getShipments = async (req: Request, res: Response, next: NextFuncti
         code: shipment.id,
         businessName: business.name,
         category: SEED_DEFAULT_CATEGORY,
-        weightKg: shipment.weightKg != null ? shipment.weightKg : SEED_DEFAULT_WEIGHT_KG,
+        weightKg: weight,
         volumeCbm: SEED_DEFAULT_VOLUME_CBM,
         origin: routeInfo.origin,
         destination: routeInfo.destination,
@@ -57,10 +60,11 @@ export const getShipments = async (req: Request, res: Response, next: NextFuncti
         dispatchTime: shipment.createdAt,
         deliveryDeadline: new Date(new Date(shipment.createdAt).getTime() + (shipment.slaMaxDeliveryHours || 48) * 3600000).toISOString(),
         status: 'in_transit',
-        estimatedSoloCostINR: SEED_DEFAULT_ESTIMATED_SOLO_COST_INR,
-        consolidatedCostINR: SEED_DEFAULT_CONSOLIDATED_COST_INR,
-        costSavingsPercent: SEED_DEFAULT_COST_SAVINGS_PERCENT,
-        co2SavedKg: SEED_DEFAULT_CO2_SAVED_KG,
+        estimatedSoloCostINR: economics.estimatedSoloCostINR,
+        consolidatedCostINR: economics.consolidatedCostINR,
+        costSavingsPercent: economics.costSavingsPercent,
+        co2SavedKg: economics.co2SavedKg,
+        consolidationReason: economics.consolidationReason,
         temperatureHistory: logs.map(l => ({
           timestamp: l.timestamp.toISOString(),
           temp: l.temp,
@@ -106,12 +110,15 @@ export const getShipmentById = async (req: Request, res: Response, next: NextFun
 
     const routeInfo = getShipmentRouteInfo(shipment.id, shipment.cargoType, shipment.origin || undefined, shipment.destination || undefined);
 
+    const weight = shipment.weightKg != null ? shipment.weightKg : SEED_DEFAULT_WEIGHT_KG;
+    const economics = calculateShipmentEconomics(weight, [routeInfo.origin.lat, routeInfo.origin.lng], [routeInfo.destination.lat, routeInfo.destination.lng]);
+
     const formatted = {
       ...shipment,
       code: shipment.id,
       businessName: business.name,
       category: SEED_DEFAULT_CATEGORY,
-      weightKg: shipment.weightKg != null ? shipment.weightKg : SEED_DEFAULT_WEIGHT_KG,
+      weightKg: weight,
       volumeCbm: SEED_DEFAULT_VOLUME_CBM,
       origin: routeInfo.origin,
       destination: routeInfo.destination,
@@ -120,10 +127,11 @@ export const getShipmentById = async (req: Request, res: Response, next: NextFun
       dispatchTime: shipment.createdAt,
       deliveryDeadline: new Date(new Date(shipment.createdAt).getTime() + (shipment.slaMaxDeliveryHours || 48) * 3600000).toISOString(),
       status: 'in_transit',
-      estimatedSoloCostINR: SEED_DEFAULT_ESTIMATED_SOLO_COST_INR,
-      consolidatedCostINR: SEED_DEFAULT_CONSOLIDATED_COST_INR,
-      costSavingsPercent: SEED_DEFAULT_COST_SAVINGS_PERCENT,
-      co2SavedKg: SEED_DEFAULT_CO2_SAVED_KG,
+      estimatedSoloCostINR: economics.estimatedSoloCostINR,
+      consolidatedCostINR: economics.consolidatedCostINR,
+      costSavingsPercent: economics.costSavingsPercent,
+      co2SavedKg: economics.co2SavedKg,
+      consolidationReason: economics.consolidationReason,
       temperatureHistory: logs.map(l => ({
         timestamp: l.timestamp.toISOString(),
         temp: l.temp,
