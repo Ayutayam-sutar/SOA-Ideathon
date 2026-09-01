@@ -16,6 +16,7 @@ import { AdminMap } from "./pages/admin/AdminMap";
 
 import { BusinessDashboard } from "./pages/BusinessDashboard";
 import { AgentDashboard } from "./pages/AgentDashboard";
+import { ShipmentDetailsPage } from "./pages/ShipmentDetailsPage";
 import { AuthProvider } from "./contexts/AuthContext";
 
 export default function App() {
@@ -56,6 +57,7 @@ export default function App() {
 
         {/* Other roles */}
         <Route path="/business" element={<BusinessDashboard />} />
+        <Route path="/business/shipments/:id" element={<ShipmentDetailsPage />} />
         <Route path="/agent" element={<AgentDashboard />} />
 
         {/* Fallback */}

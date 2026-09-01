@@ -177,3 +177,43 @@ export function getShipmentRouteInfo(shipmentId: string, cargoType?: string, ori
   dynamicLocationsCache.set(shipmentId, routeInfo);
   return routeInfo;
 }
+
+export function getEstimateDistance(coords1: [number, number], coords2: [number, number]): number {
+  const R = 6371; // km
+  const dLat = ((coords2[0] - coords1[0]) * Math.PI) / 180;
+  const dLon = ((coords2[1] - coords1[1]) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((coords1[0] * Math.PI) / 180) *
+      Math.cos((coords2[0] * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const straightLineKm = R * c;
+  return Math.max(15, Math.round(straightLineKm * 1.18));
+}
+
+export function calculateShipmentEconomics(weightKg: number, originCoords: [number, number], destCoords: [number, number]) {
+  const dist = getEstimateDistance(originCoords, destCoords);
+  
+  // Base rates for solo vs consolidated
+  // e.g. Solo truck rate: ₹35/km + ₹2/kg processing
+  const estimatedSoloCostINR = Math.round(dist * 35 + weightKg * 2);
+  
+  // Consolidation is usually 20-35% cheaper depending on distance
+  const savingsFactor = 0.15 + (Math.min(dist, 2000) / 2000) * 0.20; // 15% to 35% savings
+  const consolidatedCostINR = Math.round(estimatedSoloCostINR * (1 - savingsFactor));
+  const costSavingsPercent = Math.round(((estimatedSoloCostINR - consolidatedCostINR) / estimatedSoloCostINR) * 100);
+  
+  // CO2 savings: ~0.15 kg CO2 per km per 1000kg
+  const co2SavedKg = Math.round(dist * 0.15 * (weightKg / 1000) * (savingsFactor * 2));
+
+  return {
+    estimatedSoloCostINR,
+    consolidatedCostINR,
+    costSavingsPercent,
+    co2SavedKg,
+    consolidationReason: `Grouped with local shipments on the cold corridor. Eradicated deadhead mileage to save ${costSavingsPercent}%.`,
+    dist
+  };
+}
