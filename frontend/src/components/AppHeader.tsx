@@ -1,8 +1,8 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { User, UserRole } from '../types';
-import { dataService } from '../services/dataService';
-import { Shield, Briefcase, Navigation, ArrowRightLeft } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { Shield, Briefcase, Navigation, LogOut } from 'lucide-react';
 
 interface AppHeaderProps {
   user: User | null;
@@ -11,6 +11,16 @@ interface AppHeaderProps {
 
 export const AppHeader: React.FC<AppHeaderProps> = ({ user, activeRole }) => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
+    navigate('/');
+  };
 
   // Premium Role Theming Configurations
   const roleThemes = {
@@ -52,24 +62,21 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ user, activeRole }) => {
         <div className="flex items-center justify-between h-16 sm:h-20">
           
           {/* Brand & Platform Identity */}
-          {/* FIX: ml-12 clears the hamburger menu on mobile for admin. Reduced from ml-[3.5rem] to save space. */}
-          <div className={`flex items-center gap-2.5 sm:gap-4 transition-all duration-300 ${currentRole === 'admin' ? 'ml-12 lg:ml-0' : 'ml-0'}`}>
+          <div className="flex items-center gap-2.5 sm:gap-4 transition-all duration-300">
             
-            {/* FIX: Hide the logo link entirely on Admin Desktop (lg:hidden) because the sidebar already has it! */}
-            <Link to="/" className={`flex items-center gap-2 sm:gap-3 group ${currentRole === 'admin' ? 'lg:hidden' : ''}`}>
+            {/* Logo Link - Always visible across all roles */}
+            <Link to="/" className="flex items-center gap-2.5 sm:gap-3 group">
               
-              {/* Logo with Glowing Hover Effect */}
-              {/* FIX: Scaled container down slightly on mobile (w-10 h-10) to prevent the header from breaking, while keeping your specific scale-[1.7] effect */}
-              <div className="relative flex-shrink-0 group w-10 h-10 sm:w-12 sm:h-12">
+              {/* Logo Emblem Container */}
+              <div className="relative flex-shrink-0 group w-9 h-9 sm:w-11 sm:h-11">
                 <div className="absolute inset-0 bg-white/30 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 
                 {/* Perfect Circle Boundary */}
-                <div className="relative w-full h-full rounded-full overflow-hidden bg-white shadow-md border border-white/30">
+                <div className="relative w-full h-full rounded-full overflow-hidden bg-white shadow-md border border-white/30 flex items-center justify-center p-0.5">
                   <img 
-                    src="/src/photos/karwaanlogo4.png" 
+                    src="/karwaan-logo.png" 
                     alt="Karwaan Logo" 
-                    /* scale-[1.7] se pura logo emblem circle ke boundaries ko touch karega */
-                    className="w-full h-full object-cover object-center transform scale-[1.7] transition-transform duration-300 group-hover:scale-[2.0] group-hover:rotate-6" 
+                    className="w-full h-full object-contain transform transition-transform duration-300 group-hover:scale-110" 
                   />
                 </div>
               </div>
@@ -80,20 +87,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ user, activeRole }) => {
                   <span className="font-display font-extrabold text-lg sm:text-2xl tracking-tight text-[#FFFFFF] drop-shadow-md">
                     KARWAAN
                   </span>
-                  {/* Modernized pill badge - hidden on tiny phones, visible on tablets+ */}
+                  {/* Modernized pill badge */}
                   <span className="hidden md:inline-flex items-center font-mono text-[9px] sm:text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full bg-black/25 text-[#FFFFFF] border border-white/10 backdrop-blur-md shadow-inner">
                     AGRI-LOGISTICS
                   </span>
                 </div>
-                {/* Subtitle - visible only on desktops */}
+                {/* Subtitle - visible on larger desktops */}
                 <span className="text-[11px] font-sans font-medium text-white/80 -mt-0.5 hidden xl:block tracking-wide">
                   Multimodal Perishables Consolidation Network
                 </span>
               </div>
             </Link>
 
-            {/* Current Role Glowing Banner Chip - Always visible on desktop */}
-            <div className={`hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border backdrop-blur-md ${theme.roleBadge} ${currentRole !== 'admin' ? 'ml-2' : ''} transition-all`}>
+            {/* Current Role Glowing Banner Chip */}
+            <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border backdrop-blur-md ${theme.roleBadge} ml-1 sm:ml-2 transition-all`}>
               <IconComponent className="w-4 h-4 opacity-90" />
               <span className="tracking-wide">{theme.roleLabel}</span>
             </div>
@@ -119,15 +126,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ user, activeRole }) => {
               </div>
             )}
 
-            {/* Role Select Button */}
-            <Link
-              to="/select-role"
-              className="text-xs font-bold bg-white text-[#1A211E] px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg hover:bg-gray-50 transition-all duration-300 shadow-[0_4px_10px_rgba(0,0,0,0.15)] hover:shadow-[0_6px_15px_rgba(255,255,255,0.2)] hover:-translate-y-0.5 flex items-center gap-1.5 sm:gap-2 active:scale-95"
-            >
-              <span className="hidden sm:inline">Change Role</span>
-              <span className="sm:hidden">Switch</span>
-              <ArrowRightLeft className="w-3.5 h-3.5 opacity-70" />
-            </Link>
+            {/* Logout Button (on Business side) */}
+            {currentRole === 'business' && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-xs font-bold bg-white text-[#1A211E] px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg hover:bg-red-50 hover:text-[#B3462C] hover:border-red-200 transition-all duration-300 shadow-[0_4px_10px_rgba(0,0,0,0.15)] hover:shadow-[0_6px_15px_rgba(255,255,255,0.2)] hover:-translate-y-0.5 flex items-center gap-1.5 sm:gap-2 active:scale-95 cursor-pointer border border-transparent"
+              >
+                <span>Logout</span>
+                <LogOut className="w-3.5 h-3.5 opacity-70" />
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -13,10 +13,10 @@ interface Particle {
 }
 
 const ORIGINS = [
-  { id: 1, name: 'Mahabaleshwar Berries', x: 80, y: 190, weight: '420 kg', color: '#5C7A50' },
-  { id: 2, name: 'Baramati Artisan Cheese', x: 60, y: 90, weight: '350 kg', color: '#5C7A50' },
-  { id: 3, name: 'Talegaon Mushrooms', x: 120, y: 30, weight: '210 kg', color: '#D98E2B' },
-  { id: 4, name: 'Panchgani Polyhouse', x: 40, y: 150, weight: '280 kg', color: '#5C7A50' },
+  { id: 1, name: 'Daringbadi Strawberries', x: 80, y: 190, weight: '420 kg', color: '#5C7A50' },
+  { id: 2, name: 'Sambalpur Dairy', x: 60, y: 90, weight: '350 kg', color: '#5C7A50' },
+  { id: 3, name: 'Khurda Mushrooms', x: 120, y: 30, weight: '210 kg', color: '#D98E2B' },
+  { id: 4, name: 'Koraput Organics', x: 40, y: 150, weight: '280 kg', color: '#5C7A50' },
 ];
 
 export const ConsolidationHeroVisualizer: React.FC = () => {
@@ -161,25 +161,25 @@ export const ConsolidationHeroVisualizer: React.FC = () => {
             </g>
           ))}
 
-          {/* Node 2: Shirwal Agro Hub (Consolidation Point) */}
+          {/* Node 2: Bhubaneswar Agro Hub (Consolidation Point) */}
           <g transform="translate(230, 120)">
             <circle cx="0" cy="0" r="14" fill="#163832" />
             <circle cx="0" cy="0" r="18" fill="none" stroke="#5C7A50" strokeWidth="1.5" strokeDasharray="3 2" className="animate-spin" style={{ animationDuration: '8s' }} />
             <text x="0" y="4" textAnchor="middle" fill="#FFFFFF" className="text-[9px] font-mono font-bold">HUB</text>
-            <text x="0" y="28" textAnchor="middle" fill="#163832" className="text-[10px] font-bold font-sans">Shirwal Aggregator</text>
+            <text x="0" y="28" textAnchor="middle" fill="#163832" className="text-[10px] font-bold font-sans">Bhubaneswar Aggregator</text>
           </g>
 
-          {/* Node 3: Daund / Rail Interchange */}
+          {/* Node 3: Khurda Road / Rail Interchange */}
           <g transform="translate(360, 120)">
             <rect x="-10" y="-10" width="20" height="20" rx="3" fill="#FFFFFF" stroke="#163832" strokeWidth="2" />
             <text x="0" y="3" textAnchor="middle" fill="#163832" className="text-[8px] font-mono font-bold">RAIL</text>
-            <text x="0" y="24" textAnchor="middle" fill="#596560" className="text-[9px] font-mono font-medium">Daund Siding</text>
+            <text x="0" y="24" textAnchor="middle" fill="#596560" className="text-[9px] font-mono font-medium">Khurda Road Siding</text>
           </g>
 
           {/* Node 4: Final Terminal */}
           <g transform="translate(480, 120)">
             <circle cx="0" cy="0" r="9" fill="#5C7A50" stroke="#FFFFFF" strokeWidth="2" />
-            <text x="0" y="24" textAnchor="middle" fill="#163832" className="text-[10px] font-bold font-sans">Navi Mumbai / JNPT</text>
+            <text x="0" y="24" textAnchor="middle" fill="#163832" className="text-[10px] font-bold font-sans">Paradip Port / Terminal</text>
           </g>
         </svg>
 

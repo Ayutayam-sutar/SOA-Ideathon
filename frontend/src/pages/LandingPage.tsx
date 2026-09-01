@@ -11,8 +11,8 @@ export const LandingPage: React.FC = () => {
       <header className="bg-[#163832] text-[#FFFFFF] border-b border-[#245249] py-4 px-4 sm:px-8">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded bg-[#FFFFFF] flex items-center justify-center text-[#163832] font-display font-bold text-lg shadow-sm">
-              K
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-white shadow-sm border border-white/20 flex-shrink-0 flex items-center justify-center p-0.5">
+              <img src="/karwaan-logo.png" alt="Karwaan Logo" className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col">
               <span className="font-display font-bold text-xl tracking-tight text-[#FFFFFF]">
@@ -22,16 +22,6 @@ export const LandingPage: React.FC = () => {
                 Agri-Logistics Consolidation
               </span>
             </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <Link
-              to="/select-role"
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#5C7A50] hover:bg-[#435A3A] text-[#FFFFFF] rounded font-sans text-xs font-semibold tracking-wide transition-colors shadow-sm"
-            >
-              <span>Access Platform</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
           </div>
         </div>
       </header>
@@ -63,15 +53,8 @@ export const LandingPage: React.FC = () => {
                   to="/select-role"
                   className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-[#163832] hover:bg-[#0F2622] text-[#FFFFFF] rounded font-sans font-semibold text-sm transition-all shadow-sm group"
                 >
-                  <span>Launch Role Selection</span>
+                  <span>Launch Platform</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                </Link>
-
-                <Link
-                  to="/admin"
-                  className="inline-flex items-center justify-center gap-2 px-5 py-3.5 bg-[#FFFFFF] hover:bg-[#E5EBE3] text-[#163832] border border-[#D6DCD4] rounded font-sans font-medium text-sm transition-colors"
-                >
-                  <span>Explore Admin Operations</span>
                 </Link>
               </div>
 
@@ -171,10 +154,10 @@ export const LandingPage: React.FC = () => {
                 Interactive Multi-Role Experience
               </span>
               <h3 className="font-display font-bold text-xl sm:text-2xl text-[#FFFFFF]">
-                Experience Karwaan from any operational perspective.
+                Experience Karwaan from Your perspective.
               </h3>
               <p className="text-xs sm:text-sm text-white/80 max-w-xl">
-                Test the Platform Admin operations board or the Business Shipper order portal with live telemetry.
+                Test the Platform's Business Shipper order portal with live telemetry.
               </p>
             </div>
 
@@ -182,7 +165,7 @@ export const LandingPage: React.FC = () => {
               to="/select-role"
               className="px-6 py-3 bg-[#FFFFFF] hover:bg-[#F3F5F2] text-[#163832] font-sans font-bold text-sm rounded transition-colors shadow-sm shrink-0 inline-flex items-center gap-2"
             >
-              <span>Select Your Role</span>
+              <span>Launch Simulation</span>
               <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
@@ -197,7 +180,7 @@ export const LandingPage: React.FC = () => {
             <span>• Multimodal Perishable Consolidation System</span>
           </div>
           <div>
-            Built with React, Leaflet &amp; Explainable Agri-Logistics Logic
+            Built with ❤️ by Team Juggernaut🚀
           </div>
         </div>
       </footer>

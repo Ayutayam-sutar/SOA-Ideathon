@@ -61,8 +61,8 @@ export const RegisterPage: React.FC = () => {
       {/* Top Brand Link */}
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center mb-6">
         <Link to="/" className="inline-flex items-center gap-2.5 mb-2">
-          <div className="w-8 h-8 rounded bg-[#163832] flex items-center justify-center text-[#FFFFFF] font-display font-bold text-lg">
-            K
+          <div className="w-10 h-10 rounded-full overflow-hidden bg-white shadow-sm border border-[#D6DCD4] flex-shrink-0 flex items-center justify-center p-0.5">
+            <img src="/karwaan-logo.png" alt="Karwaan Logo" className="w-full h-full object-contain" />
           </div>
           <span className="font-display font-bold text-2xl text-[#163832] tracking-tight">
             KARWAAN
