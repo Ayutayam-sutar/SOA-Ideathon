@@ -58,4 +58,4 @@ Once the UI is open in your browser, you can log in using the demo backdoor to b
 
 - **Admin View:** `admin@karwaan.in` (Can see all data)
 - **Business View:** `logistics@sahyadri.in` (Can only see their own shipments and routes)
-- **Agent View:** `agent1@karwaan.in` (Driver dashboard view)
+- **Agent View:** `agent1@karwaan.in` (Driver dashboard view).
