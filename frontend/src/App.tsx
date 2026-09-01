@@ -41,6 +41,7 @@ export default function App() {
 
           {/* /admin/shipments */}
           <Route path="shipments" element={<AdminShipments />} />
+          <Route path="shipments/:id" element={<ShipmentDetailsPage />} />
 
           {/* /admin/clusters */}
           <Route path="clusters" element={<AdminClusters />} />

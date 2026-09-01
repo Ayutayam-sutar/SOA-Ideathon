@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import {
   Search,
@@ -17,6 +18,7 @@ type RiskFilter =
   | "critical";
 
 export const AdminShipments: React.FC = () => {
+  const navigate = useNavigate();
   const [shipments, setShipments] = useState<Shipment[]>([]);
 
   const [riskFilter, setRiskFilter] =
@@ -156,7 +158,8 @@ export const AdminShipments: React.FC = () => {
               {filteredShipments.map((shipment) => (
                 <tr
                   key={shipment.id}
-                  className="hover:bg-[#F8FAF7] transition-colors group"
+                  onClick={() => navigate(`/admin/shipments/${shipment.id}`)}
+                  className="hover:bg-[#F8FAF7] transition-colors group cursor-pointer"
                 >
                   <td className="py-3 px-3 font-mono font-bold text-[#163832]">
                     {shipment.code}

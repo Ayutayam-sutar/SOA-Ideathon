@@ -24,6 +24,7 @@ export const ShipmentDetailsPage: React.FC = () => {
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isApproving, setIsApproving] = useState(false);
 
   useEffect(() => {
     const fetchShipment = async () => {
@@ -52,10 +53,24 @@ export const ShipmentDetailsPage: React.FC = () => {
     fetchShipment();
   }, [id]);
 
+  const handleApproveShipment = async () => {
+    if (!shipment) return;
+    try {
+      setIsApproving(true);
+      await dataService.approveShipment(shipment.id);
+      setShipment({ ...shipment, status: 'in_transit' });
+    } catch (err) {
+      console.error(err);
+      alert('Failed to approve shipment');
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F8FAF7] flex flex-col">
-        <AppHeader user={user} activeRole="business" />
+        {user?.role !== 'admin' && <AppHeader user={user} activeRole="business" />}
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-[#5C7A50]" />
         </div>
@@ -66,7 +81,7 @@ export const ShipmentDetailsPage: React.FC = () => {
   if (error || !shipment) {
     return (
       <div className="min-h-screen bg-[#F8FAF7] flex flex-col">
-        <AppHeader user={user} activeRole="business" />
+        {user?.role !== 'admin' && <AppHeader user={user} activeRole="business" />}
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
           <AlertTriangle className="w-12 h-12 text-red-400 mb-4" />
           <h2 className="text-xl font-bold text-[#163832] mb-2">{error || "Shipment not found"}</h2>
@@ -82,16 +97,29 @@ export const ShipmentDetailsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAF7] flex flex-col">
-      <AppHeader user={user} activeRole="business" />
+    <div className={`bg-[#F8FAF7] flex flex-col ${user?.role === 'admin' ? 'min-h-[calc(100vh-80px)]' : 'min-h-screen'}`}>
+      {user?.role !== 'admin' && <AppHeader user={user} activeRole="business" />}
       
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-        <button 
-          onClick={() => navigate(-1)}
-          className="mb-6 flex items-center gap-2 text-[#596560] hover:text-[#163832] transition-colors font-medium text-sm"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-        </button>
+        <div className="flex items-center justify-between mb-6">
+          <button 
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 text-[#596560] hover:text-[#163832] transition-colors font-medium text-sm"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+          </button>
+
+          {user?.role === 'admin' && shipment.status === 'pending' && (
+            <button
+              onClick={handleApproveShipment}
+              disabled={isApproving}
+              className="px-5 py-2.5 bg-[#D98E2B] hover:bg-[#C27E25] disabled:bg-gray-400 text-white font-bold rounded-lg shadow-md transition-colors flex items-center gap-2"
+            >
+              {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+              {isApproving ? 'Approving...' : 'Approve Shipment'}
+            </button>
+          )}
+        </div>
 
         <div className="bg-[#163832] rounded-3xl shadow-xl overflow-hidden flex flex-col">
           {/* Top Dark Header */}
@@ -105,6 +133,7 @@ export const ShipmentDetailsPage: React.FC = () => {
               </span>
               <span className={`px-3 py-1.5 rounded text-xs font-mono font-bold uppercase tracking-wider ${
                 shipment.status === 'in_transit' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 
+                shipment.status === 'pending' ? 'bg-[#D98E2B]/20 text-[#D98E2B] border border-[#D98E2B]/30' :
                 shipment.status === 'disrupted' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 
                 shipment.status === 'delivered' ? 'bg-gray-500/20 text-gray-300 border border-gray-500/30' : 'bg-[#D98E2B]/20 text-[#D98E2B] border border-[#D98E2B]/30'
               }`}>

@@ -21,6 +21,9 @@ const KNOWN_COORDINATES: Record<string, { lat: number; lng: number; name: string
   'kolkata': { lat: 22.5726, lng: 88.3639, name: 'Kolkata Wholesale Hub' },
   'bhubaneswar': { lat: 20.2961, lng: 85.8245, name: 'Bhubaneswar Wholesale Terminal' },
   'cuttack': { lat: 20.4625, lng: 85.8830, name: 'Cuttack Agri Terminal' },
+  'kashmir': { lat: 34.0837, lng: 74.7973, name: 'Kashmir Apple Hub' },
+  'srinagar': { lat: 34.0837, lng: 74.7973, name: 'Srinagar Cold Yard' },
+  'bhopal': { lat: 23.2599, lng: 77.4126, name: 'Bhopal Central Hub' },
   'hyderabad': { lat: 17.3850, lng: 78.4867, name: 'Hyderabad Distribution Hub' },
   'hyderbad': { lat: 17.3850, lng: 78.4867, name: 'Hyderabad Distribution Hub' },
   'haryana': { lat: 29.0588, lng: 76.0856, name: 'Haryana Central Logistics Hub' },
@@ -205,7 +208,8 @@ async recommendGrouping(): Promise<any[]> {
 
     const clusterShipmentsList = await db.select().from(shipments).where(inArray(shipments.id, shipmentIds));
     const now = new Date();
-    const earliestDeparture = now;
+    // Earliest departure shouldn't be the exact current second. Add a realistic 2.5 hour loading/packing buffer.
+    const earliestDeparture = new Date(now.getTime() + (2.5 * 3600000));
 
     let mostCritical = clusterShipmentsList[0];
     clusterShipmentsList.forEach(s => {
