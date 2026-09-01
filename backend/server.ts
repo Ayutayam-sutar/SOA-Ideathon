@@ -11,6 +11,7 @@ import routesRoutes from './routes/routes';
 import incidentsRoutes from './routes/incidents';
 import recommendationsRoutes from './routes/recommendations';
 import vehiclesRoutes from './routes/vehicles';
+import hubsRoutes from './routes/hubs';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -32,6 +33,7 @@ app.use('/api/routes', routesRoutes);
 app.use('/api/incidents', incidentsRoutes);
 app.use('/api/recommendations', recommendationsRoutes);
 app.use('/api/vehicles', vehiclesRoutes);
+app.use('/api/hubs', hubsRoutes);
 
 // Error Handling (Must be last)
 app.use(errorHandler);

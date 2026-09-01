@@ -1,17 +1,20 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { Shipment, ConsolidationCluster, DeliveryRoute } from '../types';
-import { getFreshnessColor } from './FreshnessGauge';
+import { Shipment, ConsolidationCluster, DeliveryRoute, Hub } from '../types';
+import { DEFAULT_HUBS } from '../services/dataService';
 
 interface KarwaanMapProps {
-  shipments?: Shipment[];
-  clusters?: ConsolidationCluster[];
+  hubs?: Hub[];
   routes?: DeliveryRoute[];
+  clusters?: ConsolidationCluster[];
+  shipments?: Shipment[];
   selectedShipmentId?: string;
   selectedRouteId?: string;
   selectedClusterId?: string;
+  selectedHubId?: string;
   onSelectShipment?: (shipmentId: string) => void;
   onSelectRoute?: (routeId: string) => void;
+  onSelectHub?: (hubId: string) => void;
   height?: string;
   showAllControls?: boolean;
   showLegend?: boolean;
@@ -19,14 +22,17 @@ interface KarwaanMapProps {
 }
 
 export const KarwaanMap: React.FC<KarwaanMapProps> = ({
-  shipments = [],
-  clusters = [],
+  hubs = [],
   routes = [],
+  clusters = [],
+  shipments = [],
   selectedShipmentId,
   selectedRouteId,
   selectedClusterId,
+  selectedHubId,
   onSelectShipment,
   onSelectRoute,
+  onSelectHub,
   height = '480px',
   showAllControls = true,
   showLegend = true,
@@ -36,18 +42,17 @@ export const KarwaanMap: React.FC<KarwaanMapProps> = ({
   const mapInstanceRef = useRef<L.Map | null>(null);
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
 
-  // Initialize Map
+  // Initialize Leaflet Map
   useEffect(() => {
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return;
 
-    // Bounding box for India
+    // Bounding box for India region
     const indiaBounds = L.latLngBounds(
-      [6.0, 68.0],  // Southwest corner
-      [37.5, 98.0]  // Northeast corner
+      [6.0, 68.0],
+      [37.5, 98.0]
     );
 
-    // Center on Odisha region (India)
     const map = L.map(mapContainerRef.current, {
       center: [20.5, 84.5],
       zoom: 7,
@@ -81,7 +86,7 @@ export const KarwaanMap: React.FC<KarwaanMapProps> = ({
     };
   }, [showAllControls, isStatic]);
 
-  // Update Layers when data or selection changes
+  // Update Layers whenever hubs or routes data changes
   useEffect(() => {
     const map = mapInstanceRef.current;
     const layerGroup = layerGroupRef.current;
@@ -106,33 +111,33 @@ export const KarwaanMap: React.FC<KarwaanMapProps> = ({
           }
         }
         if (!coords || !Array.isArray(coords) || coords.length === 0) return;
-        
+
         const isRail = leg.mode === 'rail_cold_wagon';
-        
+
         const color = isRouteSelected
           ? (isRail ? '#163832' : '#5C7A50')
           : route.status === 'incident_reported'
           ? '#B3462C'
           : isRail
-          ? '#245249'
+          ? '#163832'
           : '#5C7A50';
 
         const polyline = L.polyline(coords, {
           color: color,
-          weight: isRouteSelected ? 6 : isRail ? 4.5 : 3.5,
-          opacity: isRouteSelected ? 0.95 : 0.8,
-          dashArray: isRail ? '8, 7' : undefined,
+          weight: isRouteSelected ? 5 : isRail ? 3.5 : 3,
+          opacity: isRouteSelected ? 0.95 : 0.75,
+          dashArray: isRail ? '6, 6' : undefined,
           lineJoin: 'round',
         });
 
-        polyline.on('click', () => {
-          if (onSelectRoute) onSelectRoute(route.id);
-        });
+        if (onSelectRoute) {
+          polyline.on('click', () => onSelectRoute(route.id));
+        }
 
         polyline.bindTooltip(
-          `<div class="font-mono text-xs p-1">
-            <strong>${isRail ? '🚂 Rail Cold Rake' : '🚛 Road Reefer'}</strong>: ${leg.distanceKm || ''} km<br/>
-            ${leg.originName} → ${leg.destinationName}
+          `<div class="font-mono text-xs p-1 font-semibold">
+            ${isRail ? '🚂 Rail Cold Rake' : '🚛 Road Reefer'}: ${leg.distanceKm ? leg.distanceKm + ' km' : ''}<br/>
+            <span class="text-[#596560] font-normal">${leg.originName || leg.origin} → ${leg.destinationName || leg.destination}</span>
            </div>`,
           { sticky: true }
         );
@@ -142,224 +147,89 @@ export const KarwaanMap: React.FC<KarwaanMapProps> = ({
       });
     });
 
-    // 2. Draw Hubs / Clusters
+    // 2. Draw Hubs from CSV / API dataset (only when explicitly provided)
+    const hubsToDraw = hubs && hubs.length > 0 ? hubs : [];
+
+    hubsToDraw.forEach((hub) => {
+      const isSelected = hub.id === selectedHubId;
+      const hubCode = hub.hubCode || hub.city || hub.name.split(' ')[0];
+
+      const hubIcon = L.divIcon({
+        className: 'custom-hub-marker',
+        html: `
+          <div class="bg-[#163832] text-[#FFFFFF] text-[10px] font-mono px-2 py-0.5 rounded border ${isSelected ? 'border-[#EBB05E] ring-2 ring-[#EBB05E]' : 'border-[#FFFFFF]'} shadow-sm flex items-center gap-1.5 whitespace-nowrap cursor-pointer hover:bg-[#0F2622] transition-all">
+            <span class="w-2 h-2 rounded-full bg-[#5C7A50]"></span>
+            <span class="font-bold">HUB: ${hubCode}</span>
+          </div>
+        `,
+        iconSize: [85, 24],
+        iconAnchor: [42, 12],
+      });
+
+      const hubMarker = L.marker([hub.latitude, hub.longitude], { icon: hubIcon });
+
+      hubMarker.bindPopup(`
+        <div style="min-width: 220px; font-family: 'IBM Plex Sans', sans-serif;">
+          <div style="background-color: #163832; color: #FFFFFF; padding: 8px 12px; font-weight: 700; font-size: 13px; border-radius: 4px 4px 0 0;">
+            ${hub.name}
+          </div>
+          <div style="padding: 10px 12px; font-size: 12px; line-height: 1.5; color: #1A211E; background: #FFFFFF;">
+            <div><strong>City:</strong> ${hub.city}</div>
+            <div><strong>Capacity:</strong> ${hub.capacityKg ? hub.capacityKg.toLocaleString() + ' kg' : 'N/A'}</div>
+            <div><strong>Connectivity:</strong> ${hub.roadAccess ? '🚛 Road' : ''} ${hub.railAccess ? '🚂 Rail' : ''}</div>
+            <div><strong>Cold Storage:</strong> ${hub.coldStorage ? '✅ Active' : '❌ None'}</div>
+            <div><strong>Reefer Cross-Dock:</strong> ${hub.reeferCrossDock ? '✅ Supported' : '❌ None'}</div>
+          </div>
+        </div>
+      `);
+
+      if (onSelectHub) {
+        hubMarker.on('click', () => onSelectHub(hub.id));
+      }
+
+      hubMarker.addTo(layerGroup);
+      bounds.extend([hub.latitude, hub.longitude]);
+    });
+
+    // 3. Draw Cluster Endpoints if any
     clusters.forEach((cluster) => {
-      // Origin Hub
-      const hubIcon = L.divIcon({
-        className: 'custom-hub-marker',
-        html: `
-          <div class="bg-[#163832] text-[#FFFFFF] text-[10px] font-mono px-2 py-0.5 rounded border border-[#FFFFFF] shadow-sm flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-[#5C7A50]"></span>
-            <span>HUB: ${cluster.originHub.hubCode || 'HUB'}</span>
-          </div>
-        `,
-        iconSize: [80, 24],
-        iconAnchor: [40, 12],
-      });
-
-      const hubMarker = L.marker([cluster.originHub.lat, cluster.originHub.lng], { icon: hubIcon });
-      hubMarker.bindPopup(`
-        <div style="min-width: 240px; font-family: 'IBM Plex Sans', sans-serif;">
-          <div style="background-color: #163832; color: #FFFFFF; padding: 8px 12px; font-weight: 600; font-size: 12px;">
-            Consolidation Hub: ${cluster.originHub.name}
-          </div>
-          <div style="padding: 10px 12px; font-size: 12px;">
-            <div style="margin-bottom: 6px;"><strong style="color: #163832;">Cluster:</strong> ${cluster.name}</div>
-            <div><strong>Active Load:</strong> ${cluster.totalWeightKg} kg / ${cluster.maxCapacityKg} kg (${cluster.reeferLoadFactorPercent}%)</div>
-            <div><strong>Temp Band:</strong> ${cluster.tempBand}</div>
-            <div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #5C7A50;">
-              Cost Savings: ${cluster.costSavingsPercent}% | CO₂ Saved: ${cluster.co2SavedKg}kg
-            </div>
-          </div>
-        </div>
-      `);
-      hubMarker.addTo(layerGroup);
-      bounds.extend([cluster.originHub.lat, cluster.originHub.lng]);
+      if (cluster.originHub && cluster.originHub.lat && cluster.originHub.lng) {
+        bounds.extend([cluster.originHub.lat, cluster.originHub.lng]);
+      }
+      if (cluster.destinationHub && cluster.destinationHub.lat && cluster.destinationHub.lng) {
+        bounds.extend([cluster.destinationHub.lat, cluster.destinationHub.lng]);
+      }
     });
 
-    // 3. Draw Shipments (Origin & Destination pins)
-    const shipmentsToDraw = selectedShipmentId
-      ? shipments.filter((s) => s.id === selectedShipmentId)
-      : selectedClusterId
-      ? shipments.filter((s) => s.clusterId === selectedClusterId)
-      : shipments;
-
-    shipmentsToDraw.forEach((shipment) => {
-      const isSelected = shipment.id === selectedShipmentId;
-      const { stroke, bgRing } = getFreshnessColor(shipment.freshnessPercent);
-
-      // Origin Pin (Freshness Colored Circle)
-      const originIcon = L.divIcon({
-        className: 'custom-shipment-origin-marker',
-        html: `
-          <div class="relative group cursor-pointer">
-            <div class="w-6 h-6 rounded-full border-2 border-[#FFFFFF] shadow-md flex items-center justify-center font-mono font-bold text-[10px]" style="background-color: ${stroke}; color: #FFFFFF;">
-              ${shipment.category === 'berries' ? '🍓' : shipment.category === 'mangoes' ? '🥭' : shipment.category === 'grapes' ? '🍇' : shipment.category === 'dairy' ? '🧀' : '🥬'}
-            </div>
-            ${isSelected ? '<div class="absolute -inset-1 rounded-full border-2 border-[#163832] animate-ping"></div>' : ''}
-          </div>
-        `,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-      });
-
-      const originMarker = L.marker([shipment.origin.lat, shipment.origin.lng], { icon: originIcon });
-      
-      originMarker.bindPopup(`
-        <div style="min-width: 250px; font-family: 'IBM Plex Sans', sans-serif;">
-          <div style="background-color: #163832; color: #FFFFFF; padding: 8px 12px; font-size: 12px; display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-family: 'IBM Plex Mono', monospace; font-weight: 700;">${shipment.code}</span>
-            <span style="background: ${stroke}; color: #FFFFFF; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600;">${shipment.freshnessPercent}% Fresh</span>
-          </div>
-          <div style="padding: 10px 12px; font-size: 12px; line-height: 1.4;">
-            <div style="font-weight: 600; color: #1A211E; margin-bottom: 2px;">${shipment.cargoType}</div>
-            <div style="color: #596560; font-size: 11px; margin-bottom: 6px;">Shipper: ${shipment.businessName}</div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: #F3F5F2; padding: 6px 8px; border-radius: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; margin-bottom: 6px;">
-              <div><strong>Weight:</strong> ${shipment.weightKg} kg</div>
-              <div><strong>Temp:</strong> ${shipment.currentTemp}°C</div>
-              <div><strong>Shelf-life:</strong> ${shipment.remainingShelfLifeHours}h left</div>
-              <div><strong>Savings:</strong> ${shipment.costSavingsPercent}%</div>
-            </div>
-
-            <div style="font-size: 11px; color: #596560;">
-              <div><strong>Origin:</strong> ${shipment.origin.name}</div>
-              <div><strong>Destination:</strong> ${shipment.destination.name}</div>
-            </div>
-          </div>
-        </div>
-      `);
-
-      originMarker.on('click', () => {
-        if (onSelectShipment) onSelectShipment(shipment.id);
-      });
-
-      originMarker.addTo(layerGroup);
-      bounds.extend([shipment.origin.lat, shipment.origin.lng]);
-
-      // Destination Pin
-      const destIcon = L.divIcon({
-        className: 'custom-shipment-dest-marker',
-        html: `
-          <div class="w-4 h-4 rounded-sm bg-[#163832] border border-[#FFFFFF] shadow-sm flex items-center justify-center text-[9px] text-[#FFFFFF]">
-            🏁
-          </div>
-        `,
-        iconSize: [16, 16],
-        iconAnchor: [8, 8],
-      });
-
-      const destMarker = L.marker([shipment.destination.lat, shipment.destination.lng], { icon: destIcon });
-      destMarker.addTo(layerGroup);
-      bounds.extend([shipment.destination.lat, shipment.destination.lng]);
-    });
-
-    // 4. Draw Checkpoints & Visible Destinations
-    const visibleStopNames = new Set([
-      // Checkpoints
-      'Tatanagar Junction', 'Tatanagar',
-      'Gaya Junction', 'Gaya',
-      'Prayagraj Junction', 'Prayagraj',
-      'Kanpur Central', 'Kanpur',
-      'Baleswar', 'Balasore',
-      'Cuttack',
-      'Bhadrak',
-      'Jajpur', 'Jajpur Road',
-      // Other visible places
-      'Baripada',
-      'Rourkela',
-      'Raipur',
-      'Vizag', 'Visakhapatnam',
-      'Koraput',
-      'Malkangiri', 'Malkanagiri',
-      'Diamond Harbour', 'Diamond harbour',
-      'Dhanbad',
-      'Patna',
-    ]);
-
-    const hubNames = new Set([
-      'Bhubaneswar Wholesale Terminal', 'Bhubaneswar',
-      'Kolkata', 'New Delhi',
-    ]);
-
-    const stopsMap = new Map<string, [number, number]>();
-    routes.forEach((route) => {
-      route.legs.forEach((leg) => {
-        if (leg.originName && leg.originCoords) {
-          stopsMap.set(leg.originName, leg.originCoords);
+    // 4. Draw simple shipment endpoints if single shipment view
+    if (shipments && shipments.length > 0 && (!hubs || hubs.length === 0)) {
+      shipments.forEach((s) => {
+        if (s.origin && s.origin.lat && s.origin.lng) {
+          const originIcon = L.divIcon({
+            className: 'custom-origin-dot',
+            html: `<div class="w-3.5 h-3.5 rounded-full bg-[#5C7A50] border-2 border-white shadow"></div>`,
+            iconSize: [14, 14],
+            iconAnchor: [7, 7],
+          });
+          const m1 = L.marker([s.origin.lat, s.origin.lng], { icon: originIcon });
+          m1.bindTooltip(`<div class="font-mono text-xs font-semibold">Origin: ${s.origin.name}</div>`);
+          m1.addTo(layerGroup);
+          bounds.extend([s.origin.lat, s.origin.lng]);
         }
-        if (leg.destinationName && leg.destinationCoords) {
-          stopsMap.set(leg.destinationName, leg.destinationCoords);
+        if (s.destination && s.destination.lat && s.destination.lng) {
+          const destIcon = L.divIcon({
+            className: 'custom-dest-dot',
+            html: `<div class="w-3.5 h-3.5 rounded-full bg-[#163832] border-2 border-white shadow"></div>`,
+            iconSize: [14, 14],
+            iconAnchor: [7, 7],
+          });
+          const m2 = L.marker([s.destination.lat, s.destination.lng], { icon: destIcon });
+          m2.bindTooltip(`<div class="font-mono text-xs font-semibold">Destination: ${s.destination.name}</div>`);
+          m2.addTo(layerGroup);
+          bounds.extend([s.destination.lat, s.destination.lng]);
         }
       });
-    });
-
-    stopsMap.forEach((coords, name) => {
-      // Skip hub cities — they get their own hub markers below
-      if (hubNames.has(name)) return;
-
-      // Check if this location should be visible
-      const isVisible = visibleStopNames.has(name);
-      if (!isVisible) return; // Skip intermediate stops entirely (no dots, nothing!)
-
-      const stopIcon = L.divIcon({
-        className: 'custom-stop-marker',
-        html: `<div class="relative flex items-center justify-center">
-            <div class="w-4 h-4 rounded-full bg-[#163832] border-2 border-[#FFFFFF] shadow-md flex items-center justify-center">
-              <div class="w-2 h-2 rounded-full bg-[#E8F5E9]"></div>
-            </div>
-          </div>`,
-        iconSize: [16, 16],
-        iconAnchor: [8, 8],
-      });
-
-      const stopMarker = L.marker(coords, { icon: stopIcon });
-      
-      // Permanent visible label
-      stopMarker.bindTooltip(
-        `<div class="font-mono text-[10px] font-bold text-[#163832] px-1">${name}</div>`,
-        { permanent: true, direction: 'top', offset: [0, -10], className: 'checkpoint-label' }
-      );
-      
-      stopMarker.addTo(layerGroup);
-      bounds.extend(coords);
-    });
-
-    // 5. Draw Hub Markers (Bhubaneswar, Kolkata, New Delhi)
-    const hubs = [
-      { name: 'Bhubaneswar', code: 'BBS', coords: [20.2961, 85.8245] as [number, number] },
-      { name: 'Kolkata', code: 'KOL', coords: [22.5726, 88.3639] as [number, number] },
-      { name: 'New Delhi', code: 'NDLS', coords: [28.6139, 77.2090] as [number, number] },
-    ];
-
-    hubs.forEach((hub) => {
-      const hubIcon = L.divIcon({
-        className: 'custom-hub-marker',
-        html: `
-          <div class="bg-[#163832] text-[#FFFFFF] text-[10px] font-mono px-2 py-0.5 rounded border border-[#FFFFFF] shadow-sm flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-[#5C7A50]"></span>
-            <span>HUB: ${hub.code}</span>
-          </div>
-        `,
-        iconSize: [80, 24],
-        iconAnchor: [40, 12],
-      });
-
-      const hubMarker = L.marker(hub.coords, { icon: hubIcon });
-      hubMarker.bindPopup(`
-        <div style="min-width: 180px; font-family: 'IBM Plex Sans', sans-serif;">
-          <div style="background-color: #163832; color: #FFFFFF; padding: 8px 12px; font-weight: 600; font-size: 12px;">
-            Hub: ${hub.name}
-          </div>
-          <div style="padding: 10px 12px; font-size: 12px;">
-            <div><strong>Code:</strong> ${hub.code}</div>
-            <div><strong>Type:</strong> Multi-Modal Cold Hub</div>
-          </div>
-        </div>
-      `);
-      hubMarker.addTo(layerGroup);
-      bounds.extend(hub.coords);
-    });
+    }
 
     const fitMap = () => {
       map.invalidateSize();
@@ -376,7 +246,7 @@ export const KarwaanMap: React.FC<KarwaanMapProps> = ({
       clearTimeout(timer1);
       clearTimeout(timer2);
     };
-  }, [shipments, clusters, routes, selectedShipmentId, selectedRouteId, selectedClusterId, onSelectShipment, onSelectRoute]);
+  }, [hubs, routes, clusters, shipments, selectedRouteId, selectedClusterId, selectedHubId, selectedShipmentId, onSelectRoute, onSelectHub, onSelectShipment]);
 
   return (
     <div 
@@ -386,29 +256,36 @@ export const KarwaanMap: React.FC<KarwaanMapProps> = ({
       {/* Map Legend Overlay */}
       {showLegend && (
         <div className="absolute top-3 right-3 z-[1000] bg-[#FFFFFF]/95 backdrop-blur-md border border-[#D6DCD4] rounded px-3 py-2 text-xs shadow-sm flex flex-col gap-1.5 select-none">
-          <div className="font-mono text-[10px] uppercase font-bold text-[#163832] tracking-wide border-b border-[#E5EBE3] pb-1">
-            Network Map Legend
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-4 h-1 bg-[#5C7A50] rounded-full inline-block" />
-            <span className="text-[#1A211E]">Road Reefer Route</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-4 h-1 border-b-2 border-dashed border-[#163832] inline-block" />
-            <span className="text-[#1A211E]">Rail Cold Wagon Rake</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#5C7A50] inline-block" />
-            <span className="text-[#1A211E]">Optimal Freshness (70%+)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#D98E2B] inline-block" />
-            <span className="text-[#1A211E]">Moderate Risk (36-69%)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#B3462C] inline-block" />
-            <span className="text-[#1A211E]">Disrupted / Low Freshness</span>
-          </div>
+          {routes && routes.length > 0 && (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="w-4 h-1 bg-[#5C7A50] rounded-full inline-block" />
+                <span className="text-[#1A211E]">Road Reefer Route</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-4 h-1 border-b-2 border-dashed border-[#163832] inline-block" />
+                <span className="text-[#1A211E]">Rail Cold Wagon Rake</span>
+              </div>
+            </>
+          )}
+          {hubs && hubs.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#163832] border border-[#FFFFFF] inline-block" />
+              <span className="text-[#1A211E]">Agri-Logistics Hub</span>
+            </div>
+          )}
+          {shipments && shipments.length > 0 && (!hubs || hubs.length === 0) && (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#5C7A50] inline-block" />
+                <span className="text-[#1A211E]">Origin / Pickup</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#163832] inline-block" />
+                <span className="text-[#1A211E]">Destination / Delivery</span>
+              </div>
+            </>
+          )}
         </div>
       )}
 
