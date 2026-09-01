@@ -57,8 +57,8 @@ export const RoleSelectionPage: React.FC = () => {
       <header className="bg-[#163832] text-[#FFFFFF] py-4 px-4 sm:px-8 border-b border-[#245249]">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded bg-[#FFFFFF] flex items-center justify-center text-[#163832] font-display font-bold text-lg">
-              K
+            <div className="w-9 h-9 rounded-full overflow-hidden bg-white shadow-sm border border-white/20 flex-shrink-0 flex items-center justify-center p-0.5">
+              <img src="/karwaan-logo.png" alt="Karwaan Logo" className="w-full h-full object-contain" />
             </div>
             <span className="font-display font-bold text-xl text-[#FFFFFF]">KARWAAN</span>
           </Link>

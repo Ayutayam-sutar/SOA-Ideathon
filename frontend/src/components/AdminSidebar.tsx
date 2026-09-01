@@ -29,7 +29,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   shipmentCount,
   clusterCount,
   openIncidentCount,
-  userName = 'Ananya Deshmukh',
+  userName = 'Lion Messiah',
   userRole = 'Platform Logistics Admin',
 }) => {
   const navigate = useNavigate();
