@@ -21,8 +21,8 @@ export const AdminShipments: React.FC = () => {
   const navigate = useNavigate();
   const [shipments, setShipments] = useState<Shipment[]>([]);
 
-  const [riskFilter, setRiskFilter] =
-    useState<RiskFilter>("all");
+  const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const [searchQuery, setSearchQuery] = useState("");
   const { hasAccess } = useAuth();
@@ -53,7 +53,12 @@ export const AdminShipments: React.FC = () => {
           shipment.freshnessPercent < 70
         : shipment.freshnessPercent < 36;
 
-    return matchesSearch && matchesRisk;
+    const matchesStatus = 
+      statusFilter === "all" 
+        ? true 
+        : shipment.status === statusFilter;
+
+    return matchesSearch && matchesRisk && matchesStatus;
   });
 
   return (
@@ -82,6 +87,22 @@ export const AdminShipments: React.FC = () => {
               }
               className="w-full bg-[#F3F5F2] border border-[#D6DCD4] rounded pl-9 pr-3 py-2 text-xs font-mono focus:outline-none focus:border-[#163832]"
             />
+          </div>
+
+          <div className="flex items-center gap-1.5 font-mono text-xs">
+            <span className="text-[#596560] text-[11px] mr-1">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-[#F3F5F2] border border-[#D6DCD4] text-[#596560] rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-[#163832] cursor-pointer"
+            >
+              <option value="all">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="in_transit">In Transit</option>
+              <option value="rejected">Rejected</option>
+              <option value="delivered">Delivered</option>
+            </select>
           </div>
 
           <div className="flex items-center gap-1.5 font-mono text-xs flex-wrap">

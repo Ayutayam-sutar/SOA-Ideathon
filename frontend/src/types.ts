@@ -25,6 +25,8 @@ export type PerishableCategory =
 
 export type ShipmentStatus =
   | 'pending'
+  | 'approved'
+  | 'rejected'
   | 'pending_consolidation'
   | 'consolidated'
   | 'in_transit'

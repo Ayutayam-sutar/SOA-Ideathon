@@ -14,7 +14,10 @@ import {
   Sparkles,
   ArrowLeft,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  X,
+  Truck,
+  Ban
 } from 'lucide-react';
 
 export const ShipmentDetailsPage: React.FC = () => {
@@ -25,6 +28,12 @@ export const ShipmentDetailsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isApproving, setIsApproving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('Volume too low for cluster');
+  const [vehicleId, setVehicleId] = useState('MH-12-HV-8990 (Reefer)');
 
   useEffect(() => {
     const fetchShipment = async () => {
@@ -58,12 +67,42 @@ export const ShipmentDetailsPage: React.FC = () => {
     try {
       setIsApproving(true);
       await dataService.approveShipment(shipment.id);
-      setShipment({ ...shipment, status: 'in_transit' });
+      setShipment({ ...shipment, status: 'approved' });
     } catch (err) {
       console.error(err);
       alert('Failed to approve shipment');
     } finally {
       setIsApproving(false);
+    }
+  };
+
+  const handleRejectShipment = async () => {
+    if (!shipment) return;
+    try {
+      setIsRejecting(true);
+      await dataService.rejectShipment(shipment.id, rejectionReason);
+      setShipment({ ...shipment, status: 'rejected', rejectionReason });
+      setShowRejectModal(false);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to reject shipment');
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
+  const handleAssignVehicle = async () => {
+    if (!shipment) return;
+    try {
+      setIsAssigning(true);
+      await dataService.assignVehicle(shipment.id, vehicleId);
+      setShipment({ ...shipment, status: 'in_transit', assignedVehicle: vehicleId });
+      setShowAssignModal(false);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to assign vehicle');
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -109,15 +148,42 @@ export const ShipmentDetailsPage: React.FC = () => {
             <ArrowLeft className="w-4 h-4" /> Back to Dashboard
           </button>
 
+          {/* Admin Actions */}
           {user?.role === 'admin' && shipment.status === 'pending' && (
-            <button
-              onClick={handleApproveShipment}
-              disabled={isApproving}
-              className="px-5 py-2.5 bg-[#D98E2B] hover:bg-[#C27E25] disabled:bg-gray-400 text-white font-bold rounded-lg shadow-md transition-colors flex items-center gap-2"
-            >
-              {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-              {isApproving ? 'Approving...' : 'Approve Shipment'}
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowRejectModal(true)}
+                className="px-5 py-2.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 font-bold rounded-lg shadow-sm transition-colors flex items-center gap-2"
+              >
+                <Ban className="w-4 h-4" /> Reject
+              </button>
+              <button
+                onClick={handleApproveShipment}
+                disabled={isApproving}
+                className="px-5 py-2.5 bg-[#D98E2B] hover:bg-[#C27E25] disabled:bg-gray-400 text-white font-bold rounded-lg shadow-md transition-colors flex items-center gap-2"
+              >
+                {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                {isApproving ? 'Approving...' : 'Approve Shipment'}
+              </button>
+            </div>
+          )}
+
+          {/* Agent Actions */}
+          {user?.role === 'agent' && shipment.status === 'approved' && (
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowRejectModal(true)}
+                className="px-5 py-2.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 font-bold rounded-lg shadow-sm transition-colors flex items-center gap-2"
+              >
+                <Ban className="w-4 h-4" /> Reject (No Vehicle)
+              </button>
+              <button
+                onClick={() => setShowAssignModal(true)}
+                className="px-5 py-2.5 bg-[#163832] hover:bg-[#1A423B] text-white font-bold rounded-lg shadow-md transition-colors flex items-center gap-2"
+              >
+                <Truck className="w-4 h-4" /> Assign Vehicle
+              </button>
+            </div>
           )}
         </div>
 
@@ -134,7 +200,8 @@ export const ShipmentDetailsPage: React.FC = () => {
               <span className={`px-3 py-1.5 rounded text-xs font-mono font-bold uppercase tracking-wider ${
                 shipment.status === 'in_transit' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 
                 shipment.status === 'pending' ? 'bg-[#D98E2B]/20 text-[#D98E2B] border border-[#D98E2B]/30' :
-                shipment.status === 'disrupted' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 
+                shipment.status === 'approved' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                (shipment.status === 'disrupted' || shipment.status === 'rejected') ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 
                 shipment.status === 'delivered' ? 'bg-gray-500/20 text-gray-300 border border-gray-500/30' : 'bg-[#D98E2B]/20 text-[#D98E2B] border border-[#D98E2B]/30'
               }`}>
                 {shipment.status.replace('_', ' ')}
@@ -160,6 +227,81 @@ export const ShipmentDetailsPage: React.FC = () => {
 
           {/* Bottom Light Section */}
           <div className="bg-white rounded-[24px] p-8 sm:p-10 flex flex-col gap-8 -mt-4 relative z-20">
+            
+            {/* Workflow Status Timeline */}
+            <div className="border border-[#E5EBE3] rounded-2xl p-6 bg-[#F8FAF7]">
+              <h3 className="font-display font-bold text-sm text-[#163832] mb-5 uppercase tracking-widest">Shipment Workflow Status</h3>
+              <div className="relative flex justify-between">
+                <div className="absolute top-1/2 left-0 right-0 h-1 bg-[#E5EBE3] -translate-y-1/2 rounded-full overflow-hidden">
+                  <div className={`h-full bg-[#5C7A50] transition-all duration-500 ${
+                    shipment.status === 'delivered' ? 'w-full' :
+                    shipment.status === 'in_transit' ? 'w-2/3' :
+                    shipment.status === 'approved' ? 'w-1/3' :
+                    (shipment.status === 'rejected' || shipment.status === 'disrupted') ? 'w-0 bg-red-400' : 'w-0'
+                  }`}></div>
+                </div>
+
+                {/* Step 1: Pending */}
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-2 shadow-sm ${
+                    shipment.status === 'pending' ? 'bg-[#D98E2B] border-[#D98E2B] text-white ring-4 ring-[#D98E2B]/20' : 
+                    (shipment.status !== 'rejected') ? 'bg-[#5C7A50] border-[#5C7A50] text-white' : 'bg-gray-100 border-gray-300 text-gray-400'
+                  }`}>
+                    1
+                  </div>
+                  <div className="mt-3 text-center w-24">
+                    <span className="block text-xs font-bold text-[#163832]">Pending</span>
+                    <span className="block text-[10px] text-gray-500 mt-1">Awaiting AI cluster grouping by Admin.</span>
+                  </div>
+                </div>
+
+                {/* Step 2: Approved */}
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-2 shadow-sm ${
+                    shipment.status === 'approved' ? 'bg-blue-500 border-blue-500 text-white ring-4 ring-blue-500/20' : 
+                    ['in_transit', 'delivered'].includes(shipment.status) ? 'bg-[#5C7A50] border-[#5C7A50] text-white' : 
+                    shipment.status === 'rejected' ? 'bg-red-500 border-red-500 text-white' : 'bg-white border-[#D6DCD4] text-gray-400'
+                  }`}>
+                    {shipment.status === 'rejected' ? <Ban className="w-4 h-4" /> : '2'}
+                  </div>
+                  <div className="mt-3 text-center w-24">
+                    <span className={`block text-xs font-bold ${shipment.status === 'rejected' ? 'text-red-600' : 'text-[#163832]'}`}>
+                      {shipment.status === 'rejected' ? 'Rejected' : 'Approved'}
+                    </span>
+                    <span className="block text-[10px] text-gray-500 mt-1">
+                      {shipment.status === 'rejected' ? shipment.rejectionReason : 'Grouped into a cluster. Awaiting dispatch.'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Step 3: In Transit */}
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-2 shadow-sm ${
+                    shipment.status === 'in_transit' ? 'bg-[#5C7A50] border-[#5C7A50] text-white ring-4 ring-[#5C7A50]/20' : 
+                    shipment.status === 'delivered' ? 'bg-[#5C7A50] border-[#5C7A50] text-white' : 'bg-white border-[#D6DCD4] text-gray-400'
+                  }`}>
+                    3
+                  </div>
+                  <div className="mt-3 text-center w-24">
+                    <span className="block text-xs font-bold text-[#163832]">In Transit</span>
+                    <span className="block text-[10px] text-gray-500 mt-1">Agent dispatched. Multi-stop route active.</span>
+                  </div>
+                </div>
+
+                {/* Step 4: Delivered */}
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-2 shadow-sm ${
+                    shipment.status === 'delivered' ? 'bg-[#5C7A50] border-[#5C7A50] text-white ring-4 ring-[#5C7A50]/20' : 'bg-white border-[#D6DCD4] text-gray-400'
+                  }`}>
+                    4
+                  </div>
+                  <div className="mt-3 text-center w-24">
+                    <span className="block text-xs font-bold text-[#163832]">Delivered</span>
+                    <span className="block text-[10px] text-gray-500 mt-1">Safely handed over at destination hub.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Left Column in Details */}
@@ -261,6 +403,116 @@ export const ShipmentDetailsPage: React.FC = () => {
           </div>
         </div>
       </main>
+
+      {/* Reject Modal */}
+      {showRejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#163832]/80 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-[#E5EBE3] flex justify-between items-center bg-[#F8FAF7]">
+              <div className="flex items-center gap-3 text-red-600">
+                <AlertTriangle className="w-6 h-6" />
+                <h3 className="font-display font-bold text-xl">Reject Shipment</h3>
+              </div>
+              <button onClick={() => setShowRejectModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-[#163832] mb-2">Reason for Rejection</label>
+                <select
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="w-full px-4 py-3 bg-[#F8FAF7] border border-[#D6DCD4] rounded-lg focus:ring-2 focus:ring-[#5C7A50] focus:border-[#5C7A50] transition-colors"
+                >
+                  <option value="Volume too low for cluster">Volume too low for cluster</option>
+                  <option value="No available reefer vehicles">No available reefer vehicles</option>
+                  <option value="Temperature constraints mismatch">Temperature constraints mismatch</option>
+                  <option value="Outside serviceable area">Outside serviceable area</option>
+                  <option value="Other">Other (Type below)</option>
+                </select>
+              </div>
+              {rejectionReason === 'Other' && (
+                <div>
+                  <textarea
+                    placeholder="Enter rejection reason..."
+                    className="w-full px-4 py-3 bg-[#F8FAF7] border border-[#D6DCD4] rounded-lg focus:ring-2 focus:ring-[#5C7A50] focus:border-[#5C7A50] transition-colors"
+                    rows={3}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="p-6 border-t border-[#E5EBE3] flex justify-end gap-3 bg-gray-50">
+              <button
+                onClick={() => setShowRejectModal(false)}
+                className="px-5 py-2.5 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRejectShipment}
+                disabled={isRejecting}
+                className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-md transition-colors flex items-center gap-2 disabled:bg-gray-400"
+              >
+                {isRejecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+                Confirm Rejection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Vehicle Modal */}
+      {showAssignModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#163832]/80 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-[#E5EBE3] flex justify-between items-center bg-[#F8FAF7]">
+              <div className="flex items-center gap-3 text-[#163832]">
+                <Truck className="w-6 h-6" />
+                <h3 className="font-display font-bold text-xl">Assign Vehicle</h3>
+              </div>
+              <button onClick={() => setShowAssignModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-[#163832] mb-2">Select Available Vehicle</label>
+                <select
+                  value={vehicleId}
+                  onChange={(e) => setVehicleId(e.target.value)}
+                  className="w-full px-4 py-3 bg-[#F8FAF7] border border-[#D6DCD4] rounded-lg focus:ring-2 focus:ring-[#5C7A50] focus:border-[#5C7A50] transition-colors"
+                >
+                  <option value="MH-12-HV-8990 (Reefer)">MH-12-HV-8990 (Reefer) - Capacity: 5000kg</option>
+                  <option value="DL-01-AB-1234 (Insulated)">DL-01-AB-1234 (Insulated) - Capacity: 3000kg</option>
+                  <option value="KA-05-MN-9876 (Multi-temp)">KA-05-MN-9876 (Multi-temp) - Capacity: 7000kg</option>
+                </select>
+              </div>
+              <div className="bg-emerald-50 text-emerald-800 p-4 rounded-lg border border-emerald-100 flex items-start gap-3">
+                 <ShieldCheck className="w-5 h-5 mt-0.5 text-emerald-600 flex-shrink-0" />
+                 <p className="text-sm">Assigning this vehicle will transition the shipment to <strong>In Transit</strong> and notify the shipper.</p>
+              </div>
+            </div>
+            <div className="p-6 border-t border-[#E5EBE3] flex justify-end gap-3 bg-gray-50">
+              <button
+                onClick={() => setShowAssignModal(false)}
+                className="px-5 py-2.5 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAssignVehicle}
+                disabled={isAssigning}
+                className="px-5 py-2.5 bg-[#163832] hover:bg-[#1A423B] text-white font-bold rounded-lg shadow-md transition-colors flex items-center gap-2 disabled:bg-gray-400"
+              >
+                {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Truck className="w-4 h-4" />}
+                Confirm Assignment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

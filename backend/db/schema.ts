@@ -58,6 +58,8 @@ export const shipments = pgTable('shipments', {
   origin: text('origin'),
   destination: text('destination'),
   status: varchar('status', { length: 50 }).default('pending').notNull(),
+  rejectionReason: text('rejection_reason'),
+  assignedVehicle: text('assigned_vehicle'),
   pickupStartHour: integer('pickup_start_hour'),
   pickupEndHour: integer('pickup_end_hour'),
   deliveryDeadlineHr: integer('delivery_deadline_hr'),

@@ -63,6 +63,25 @@ function buildDynamicStops(routeId: string, legs: any[], clusterShipmentIds: str
       });
     }
 
+    // 2.5 Multi-stop / Intermediate Drop Simulation
+    // If the leg is road_reefer_truck and it's Odihsa to Bengal, let's simulate intermediate drops
+    if (leg.mode === 'road_reefer_truck' && leg.origin.includes('Bhubaneswar') && leg.destination.includes('Kolkata')) {
+       stops.push({
+         id: `STOP-${routeId}-DROP-BALASORE`,
+         sequence: stops.length + 1,
+         type: 'delivery',
+         name: 'Balasore Highway Node',
+         address: 'Balasore Cold Chain Aggregator Point',
+         scheduledTime: '12:30 PM',
+         completedTime: null,
+         isCompleted: false,
+         actionLabel: 'Partial Unloading (Multi-stop Drop)',
+         shipmentIds: [clusterShipmentIds[0] || ''],
+         contactPerson: 'Local Distributor',
+         notes: 'Unload cargo designated for Balasore/Bhadrak local distribution.'
+       });
+    }
+
     // 3. Final Destination Stop
     if (index === legs.length - 1) {
       stops.push({
