@@ -14,56 +14,89 @@ export const RouteExplanationPanel: React.FC<RouteExplanationPanelProps> = ({
   onReoptimize,
   canReoptimize = false,
 }) => {
-  const [dynamicExplanation, setDynamicExplanation] = React.useState(route.explanation);
+  const [aiExplanations, setAiExplanations] = React.useState<Record<string, any>>({});
   const [isGenerating, setIsGenerating] = React.useState(false);
 
-  React.useEffect(() => {
-    let isMounted = true;
-    const fetchExplanation = async () => {
-      setIsGenerating(true);
-      try {
-        const explained = await explanationService.explainRouteChoice(route);
-        if (isMounted) setDynamicExplanation(explained);
-      } catch (e) {
-        if (isMounted) setDynamicExplanation(route.explanation);
-      } finally {
-        if (isMounted) setIsGenerating(false);
-      }
-    };
-    fetchExplanation();
-    return () => { isMounted = false; };
-  }, [route]);
+  const handleGenerateAiInsights = async () => {
+    setIsGenerating(true);
+    try {
+      const explained = await explanationService.explainRouteChoice(route);
+      setAiExplanations((prev) => ({
+        ...prev,
+        [route.id]: explained,
+      }));
+    } catch (e) {
+      console.error("Failed to generate AI explanation:", e);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
+  const dynamicExplanation = aiExplanations[route.id] || route.explanation;
+  const hasAiInsights = Boolean(aiExplanations[route.id]);
   const explanation = dynamicExplanation;
 
   return (
     <div className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-5 shadow-sm space-y-5">
       {/* Header with Algorithmic Explainability Badge */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E5EBE3] pb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E5EBE3] pb-3">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded bg-[#163832]/10 text-[#163832] flex items-center justify-center">
             <Sparkles className="w-4 h-4 text-[#163832]" />
           </div>
           <div>
-            <h3 className="font-display font-bold text-base text-[#163832]">
-              Route Optimization & Decision Logic {isGenerating && <span className="text-xs text-[#5C7A50] animate-pulse ml-2">(Generating AI insights...)</span>}
-            </h3>
-            <span className="font-mono text-[11px] text-[#596560]">
-              ROUTE CODE: {route.code} • STATUS: {route.status.toUpperCase()}
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-display font-bold text-base text-[#163832]">
+                Route Optimization & Decision Logic
+              </h3>
+              {isGenerating && (
+                <span className="text-xs text-[#5C7A50] animate-pulse">
+                  (Generating AI insights...)
+                </span>
+              )}
+              {!isGenerating && hasAiInsights && (
+                <span className="text-[10px] font-mono font-bold bg-[#5C7A50]/15 text-[#5C7A50] px-2 py-0.5 rounded border border-[#5C7A50]/20">
+                  AI ENHANCED
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono mt-0.5">
+              <span className="font-bold text-[#163832] bg-[#163832]/10 px-2 py-0.5 rounded">
+                🚚 FLEET: {route.vehicleId || 'OD-02-AX-4592 (Tata 14T Reefer)'}
+              </span>
+              <span className="text-[#596560]">ROUTE: {route.code}</span>
+              <span className="text-[#596560]">•</span>
+              <span className="font-bold text-[#5C7A50]">STATUS: {route.status.toUpperCase()}</span>
+            </div>
           </div>
         </div>
 
-        {route.status === 'incident_reported' && canReoptimize && (
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
-            onClick={onReoptimize}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#B3462C] hover:bg-[#8F341E] text-[#FFFFFF] rounded text-xs font-mono font-bold tracking-wide transition-colors shadow-sm"
+            onClick={handleGenerateAiInsights}
+            disabled={isGenerating}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#163832] hover:bg-[#245249] text-[#FFFFFF] rounded text-xs font-mono font-bold tracking-wide transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <AlertCircle className="w-3.5 h-3.5" />
-            Re-optimize affected route
+            <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : 'text-[#8CE1A6]'}`} />
+            {isGenerating
+              ? 'Generating AI Insights...'
+              : hasAiInsights
+              ? 'Regenerate AI Insights'
+              : 'Generate AI Insights'}
           </button>
-        )}
+
+          {route.status === 'incident_reported' && canReoptimize && (
+            <button
+              type="button"
+              onClick={onReoptimize}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#B3462C] hover:bg-[#8F341E] text-[#FFFFFF] rounded text-xs font-mono font-bold tracking-wide transition-colors shadow-sm"
+            >
+              <AlertCircle className="w-3.5 h-3.5" />
+              Re-optimize affected route
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Primary Summary Callout */}
@@ -150,16 +183,7 @@ export const RouteExplanationPanel: React.FC<RouteExplanationPanelProps> = ({
         </div>
       </div>
 
-      {/* Exclusions Notice (Why any shipment was held/excluded) */}
-      {explanation.exclusionNotes && (
-        <div className="bg-[#FFF8F0] border border-[#D98E2B]/30 p-3 rounded text-xs text-[#596560]">
-          <div className="flex items-center gap-1.5 font-bold text-[#D98E2B] font-mono text-[11px] mb-1">
-            <AlertCircle className="w-3.5 h-3.5" />
-            <span>Exclusion Policy Notice</span>
-          </div>
-          <p>{explanation.exclusionNotes}</p>
-        </div>
-      )}
+
 
       {/* Dynamic Re-Routing Audit Trail */}
       {explanation.rerouteHistory && explanation.rerouteHistory.length > 0 && (

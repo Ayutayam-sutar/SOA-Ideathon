@@ -34,32 +34,38 @@ export const AdminShipments: React.FC = () => {
     loadData();
   }, []);
 
-  const filteredShipments = shipments.filter((shipment) => {
-    const query = searchQuery.toLowerCase();
+  const filteredShipments = shipments
+    .filter((shipment) => {
+      const query = searchQuery.toLowerCase();
 
-    const matchesSearch =
-      shipment.code.toLowerCase().includes(query) ||
-      shipment.cargoType.toLowerCase().includes(query) ||
-      shipment.businessName.toLowerCase().includes(query) ||
-      shipment.destination.name.toLowerCase().includes(query);
+      const matchesSearch =
+        shipment.code.toLowerCase().includes(query) ||
+        shipment.cargoType.toLowerCase().includes(query) ||
+        shipment.businessName.toLowerCase().includes(query) ||
+        shipment.destination.name.toLowerCase().includes(query);
 
-    const matchesRisk =
-      riskFilter === "all"
-        ? true
-        : riskFilter === "optimal"
-        ? shipment.freshnessPercent >= 70
-        : riskFilter === "moderate"
-        ? shipment.freshnessPercent >= 36 &&
-          shipment.freshnessPercent < 70
-        : shipment.freshnessPercent < 36;
+      const matchesRisk =
+        riskFilter === "all"
+          ? true
+          : riskFilter === "optimal"
+          ? shipment.freshnessPercent >= 70
+          : riskFilter === "moderate"
+          ? shipment.freshnessPercent >= 36 &&
+            shipment.freshnessPercent < 70
+          : shipment.freshnessPercent < 36;
 
-    const matchesStatus = 
-      statusFilter === "all" 
-        ? true 
-        : shipment.status === statusFilter;
+      const matchesStatus = 
+        statusFilter === "all" 
+          ? true 
+          : shipment.status === statusFilter;
 
-    return matchesSearch && matchesRisk && matchesStatus && shipment.status !== 'draft';
-  });
+      return matchesSearch && matchesRisk && matchesStatus && shipment.status !== 'draft';
+    })
+    .sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.dispatchTime || 0).getTime();
+      const timeB = new Date(b.createdAt || b.dispatchTime || 0).getTime();
+      return timeB - timeA;
+    });
 
   return (
     <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">

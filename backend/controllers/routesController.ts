@@ -33,23 +33,74 @@ function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: num
   return Math.max(5, Math.round(R * c));
 }
 
+// Seed-friendly distinct vehicles for the 4 primary active fleet corridors
+const DEFAULT_ROUTE_VEHICLES = [
+  'OD-02-AX-4592 (Tata 14T Reefer)',
+  'OD-33-K-1092 (Mahindra Bolero Maxi)',
+  'OD-07-H-8821 (Ashok Leyland 16T)',
+  'OD-14-M-3349 (Eicher Pro Reefer)',
+];
+
+const DEFAULT_CORRIDORS = [
+  { origin: 'Bhubaneswar Central Cold Hub', waypoint: 'Bhubaneswar Central Cold Hub Rail Hub', destination: 'Visakhapatnam Port Hub' },
+  { origin: 'Bhubaneswar Central Cold Hub', waypoint: 'Cuttack Transshipment Node', destination: 'Balasore Cold Hub' },
+  { origin: 'Bhubaneswar Central Cold Hub', waypoint: 'Rourkela Junction Depot', destination: 'Jamshedpur Multimodal Hub' },
+  { origin: 'Bhubaneswar Central Cold Hub', waypoint: 'Angul Cold Staging Yard', destination: 'Sambalpur Agro Cold Storage' },
+];
+
+function buildRouteLegsIfMissing(routeId: string, existingLegs: any[], index: number, matchingShipmentDetails: any[]): any[] {
+  if (existingLegs && existingLegs.length > 0) return existingLegs;
+
+  const corridor = DEFAULT_CORRIDORS[index % DEFAULT_CORRIDORS.length];
+  const origin = matchingShipmentDetails[0]?.origin || corridor.origin;
+  const destination = matchingShipmentDetails[0]?.destination || corridor.destination;
+  const waypoint = corridor.waypoint;
+
+  return [
+    {
+      id: `LEG-${routeId}-1`,
+      routeId,
+      sequence: 1,
+      mode: 'road_reefer_truck',
+      origin,
+      destination: waypoint,
+    },
+    {
+      id: `LEG-${routeId}-2`,
+      routeId,
+      sequence: 2,
+      mode: index % 2 === 0 ? 'rail_cold_wagon' : 'road_reefer_truck',
+      origin: waypoint,
+      destination,
+    }
+  ];
+}
+
+// In-memory persistent map for driver stop completion timestamps
+const completedRouteStops = new Map<string, Map<string, string>>();
+
 // Helper: Dynamically build sequential stops for the Driver/Agent manifest
 function buildDynamicStops(routeId: string, legs: any[], clusterShipmentIds: string[]) {
   if (!legs || legs.length === 0) return [];
 
   const stops: any[] = [];
+  const routeStopsMap = completedRouteStops.get(routeId);
 
   legs.forEach((leg, index) => {
     if (index === 0) {
+      const stopId = `STOP-${routeId}-ORIGIN`;
+      const isCompleted = routeStopsMap ? (routeStopsMap.has(stopId) || true) : true;
+      const completedTime = routeStopsMap?.get(stopId) || '06:30 AM';
+
       stops.push({
-        id: `STOP-${routeId}-ORIGIN`,
+        id: stopId,
         sequence: 1,
         type: 'pickup',
         name: leg.origin,
         address: `${leg.origin}, Cold Storage Facility`,
         scheduledTime: '06:00 AM',
-        completedTime: '06:30 AM',
-        isCompleted: true,
+        completedTime: isCompleted ? completedTime : null,
+        isCompleted,
         actionLabel: 'Load consolidated reefer cargo & verify temp seal',
         shipmentIds: clusterShipmentIds,
         contactPerson: 'Hub Dispatcher (+91 94370 12345)',
@@ -58,15 +109,19 @@ function buildDynamicStops(routeId: string, legs: any[], clusterShipmentIds: str
     }
 
     if (index > 0) {
+      const stopId = `STOP-${routeId}-TRANSFER-${index}`;
+      const isCompleted = routeStopsMap ? (routeStopsMap.has(stopId) || index === 1) : (index === 1);
+      const completedTime = routeStopsMap?.get(stopId) || (index === 1 ? '09:15 AM' : null);
+
       stops.push({
-        id: `STOP-${routeId}-TRANSFER-${index}`,
+        id: stopId,
         sequence: stops.length + 1,
         type: leg.mode === 'rail_cold_wagon' ? 'rail_transfer' : 'waypoint',
         name: leg.origin,
         address: `${leg.origin} Multi-Modal Transshipment Hub`,
         scheduledTime: `${8 + index * 3}:00 AM`,
-        completedTime: index === 1 ? '09:15 AM' : null,
-        isCompleted: index === 1,
+        completedTime: isCompleted ? completedTime : null,
+        isCompleted,
         actionLabel: leg.mode === 'rail_cold_wagon' ? 'Cross-dock to Kisan Rail cold rake' : 'Driver switch & reefer inspection',
         shipmentIds: clusterShipmentIds,
         contactPerson: 'Station Yard Master',
@@ -74,33 +129,20 @@ function buildDynamicStops(routeId: string, legs: any[], clusterShipmentIds: str
       });
     }
 
-    if (leg.mode === 'road_reefer_truck' && leg.origin.includes('Bhubaneswar') && leg.destination.includes('Kolkata')) {
-       stops.push({
-         id: `STOP-${routeId}-DROP-BALASORE`,
-         sequence: stops.length + 1,
-         type: 'delivery',
-         name: 'Balasore Highway Node',
-         address: 'Balasore Cold Chain Aggregator Point',
-         scheduledTime: '12:30 PM',
-         completedTime: null,
-         isCompleted: false,
-         actionLabel: 'Partial Unloading (Multi-stop Drop)',
-         shipmentIds: [clusterShipmentIds[0] || ''],
-         contactPerson: 'Local Distributor',
-         notes: 'Unload cargo designated for Balasore/Bhadrak local distribution.'
-       });
-    }
-
     if (index === legs.length - 1) {
+      const stopId = `STOP-${routeId}-DEST`;
+      const isCompleted = Boolean(routeStopsMap && routeStopsMap.has(stopId));
+      const completedTime = routeStopsMap?.get(stopId) || null;
+
       stops.push({
-        id: `STOP-${routeId}-DEST`,
+        id: stopId,
         sequence: stops.length + 1,
         type: 'delivery',
         name: leg.destination,
         address: `${leg.destination} Terminal & Distribution Market`,
         scheduledTime: `${10 + (index + 1) * 3}:00 PM`,
-        completedTime: null,
-        isCompleted: false,
+        completedTime: isCompleted ? completedTime : null,
+        isCompleted,
         actionLabel: 'Final unloading, freshness validation & proof of delivery',
         shipmentIds: clusterShipmentIds,
         contactPerson: 'Receiving In-charge (+91 98610 54321)',
@@ -146,31 +188,58 @@ export const getRoutes = async (req: Request, res: Response, next: NextFunction)
     if (results.length === 0) return res.status(200).json([]);
 
     const routeIds = results.map(r => r.id);
-    const clusterIds = results.map(r => r.clusterId).filter(Boolean) as string[];
 
     const allLegs = await db.select().from(routeLegs).where(inArray(routeLegs.routeId, routeIds)).orderBy(asc(routeLegs.sequence));
-    
-    let allClusterShipments: any[] = [];
-    if (clusterIds.length > 0) {
-      allClusterShipments = await db.select().from(clusterShipments).where(inArray(clusterShipments.clusterId, clusterIds));
-    }
+    const allClusterShipments = await db.select().from(clusterShipments);
+    const allShipments = await db.select().from(shipments);
+    const allClusters = await db.select().from(consolidationClusters);
 
-    const formattedRoutes = results.map((route) => {
-      const legs = allLegs.filter(l => l.routeId === route.id);
-      const matchingShipments = allClusterShipments.filter(cs => cs.clusterId === route.clusterId).map(cs => cs.shipmentId);
+    const formattedRoutes = results.map((route, index) => {
+      const assignedVehicle = route.vehicleId || DEFAULT_ROUTE_VEHICLES[index % DEFAULT_ROUTE_VEHICLES.length];
+      
+      // Find matching cluster for this route
+      const matchingCluster = allClusters.find(c => 
+        (route.clusterId && c.id === route.clusterId) || 
+        route.id.includes(c.id.replace('REC-CLST-', '').replace('CLST-', ''))
+      );
+
+      const targetClusterId = route.clusterId || matchingCluster?.id;
+
+      let matchingShipments: string[] = [];
+      if (targetClusterId) {
+        matchingShipments = allClusterShipments
+          .filter((cs: any) => cs.clusterId === targetClusterId)
+          .map((cs: any) => cs.shipmentId);
+      }
+
+      // If no cluster mapped, fall back to shipments assigned strictly to this route
+      if (matchingShipments.length === 0) {
+        matchingShipments = allShipments
+          .filter(s => s.assignedVehicle === assignedVehicle)
+          .slice(0, 6)
+          .map(s => s.id);
+      }
+
+      const matchingShipmentDetails = allShipments.filter(s => matchingShipments.includes(s.id));
+
+      const rawLegs = allLegs.filter(l => l.routeId === route.id);
+      const legs = buildRouteLegsIfMissing(route.id, rawLegs, index, matchingShipmentDetails);
+
       const locInfo = getRouteCurrentLocation(route.id);
-
       const computedStops = buildDynamicStops(route.id, legs, matchingShipments);
+
+      const clusterCode = targetClusterId || route.clusterId || 'Consolidated';
 
       return {
         ...route,
         code: route.id,
-        clusterName: `Cluster ${route.clusterId || 'Consolidated'}`,
-        name: route.name || `Route for ${route.clusterId || route.id}`,
+        clusterId: clusterCode,
+        clusterName: `Cluster ${clusterCode}`,
+        name: `Route for ${clusterCode}`,
         driverAgentId: route.driverAgentId || 'USR-AGENT-01',
         driverAgentName: 'Active Fleet Pilot', 
         driverAgentPhone: '+91 94370 00199',   
-        vehicleId: route.vehicleId || 'OD-02-AX-4592 (Tata 14T Reefer)',
+        vehicleId: assignedVehicle,
         currentLocation: locInfo.currentLocation,
         currentLocationName: locInfo.currentLocationName || 'Odisha Highway Corridor',
         lastUpdated: route.createdAt,
@@ -240,26 +309,52 @@ export const getRouteById = async (req: Request, res: Response, next: NextFuncti
       if (ownershipCheck.length === 0) return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const legs = await db.select().from(routeLegs).where(eq(routeLegs.routeId, route.id)).orderBy(asc(routeLegs.sequence));
-    
+    const rawLegs = await db.select().from(routeLegs).where(eq(routeLegs.routeId, route.id)).orderBy(asc(routeLegs.sequence));
+    const allClusterShipments = await db.select().from(clusterShipments);
+    const allShipments = await db.select().from(shipments);
+    const allClusters = await db.select().from(consolidationClusters);
+
+    const matchingCluster = allClusters.find(c => 
+      (route.clusterId && c.id === route.clusterId) || 
+      route.id.includes(c.id.replace('REC-CLST-', '').replace('CLST-', ''))
+    );
+
+    const targetClusterId = route.clusterId || matchingCluster?.id;
+
     let matchingShipments: string[] = [];
-    if (route.clusterId) {
-      const cs = await db.select().from(clusterShipments).where(eq(clusterShipments.clusterId, route.clusterId));
-      matchingShipments = cs.map(item => item.shipmentId);
+    if (targetClusterId) {
+      matchingShipments = allClusterShipments
+        .filter((cs: any) => cs.clusterId === targetClusterId)
+        .map((cs: any) => cs.shipmentId);
     }
+
+    const assignedVehicle = route.vehicleId || 'OD-02-AX-4592 (Tata 14T Reefer)';
+
+    if (matchingShipments.length === 0) {
+      matchingShipments = allShipments
+        .filter(s => s.assignedVehicle === assignedVehicle)
+        .slice(0, 6)
+        .map(s => s.id);
+    }
+
+    const matchingShipmentDetails = allShipments.filter(s => matchingShipments.includes(s.id));
+    const legs = buildRouteLegsIfMissing(route.id, rawLegs, 0, matchingShipmentDetails);
 
     const locInfo = getRouteCurrentLocation(route.id);
     const computedStops = buildDynamicStops(route.id, legs, matchingShipments);
 
+    const clusterCode = targetClusterId || route.clusterId || 'Consolidated';
+
     const formatted = {
       ...route,
       code: route.id,
-      clusterName: `Cluster ${route.clusterId || 'Consolidated'}`,
-      name: `Route for ${route.clusterId || route.id}`,
+      clusterId: clusterCode,
+      clusterName: `Cluster ${clusterCode}`,
+      name: `Route for ${clusterCode}`,
       driverAgentId: route.driverAgentId || 'USR-AGENT-01',
       driverAgentName: 'Active Fleet Pilot',
       driverAgentPhone: '+91 94370 00199',
-      vehicleId: route.vehicleId || 'OD-02-AX-4592 (Tata 14T Reefer)',
+      vehicleId: assignedVehicle,
       currentLocation: locInfo.currentLocation,
       currentLocationName: locInfo.currentLocationName || 'Odisha Highway Corridor',
       lastUpdated: route.createdAt,
@@ -396,7 +491,18 @@ export const completeRoute = async (req: Request, res: Response, next: NextFunct
 export const updateRoute = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
-    const { status, totalCost } = req.body;
+    const { status, totalCost, action, stopId } = req.body;
+
+    if (action === 'complete_stop' && stopId) {
+      if (!completedRouteStops.has(id)) {
+        completedRouteStops.set(id, new Map());
+        completedRouteStops.get(id)!.set(`STOP-${id}-ORIGIN`, '06:30 AM');
+        completedRouteStops.get(id)!.set(`STOP-${id}-TRANSFER-1`, '09:15 AM');
+      }
+      const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      completedRouteStops.get(id)!.set(stopId, timeStr);
+      return res.status(200).json({ success: true, message: `Stop ${stopId} marked completed at ${timeStr}.` });
+    }
 
     const existing = await db.select(safeRouteColumns).from(deliveryRoutes).where(eq(deliveryRoutes.id, id)).limit(1);
     if (existing.length === 0) return res.status(404).json({ error: 'Route not found' });

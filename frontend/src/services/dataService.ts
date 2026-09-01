@@ -76,7 +76,12 @@ class DataService {
   // Shipments
   public async getShipments(): Promise<Shipment[]> {
     const data = await apiClient.get('/shipments');
-    return Array.isArray(data) ? data : data.shipments || [];
+    const rawList: Shipment[] = Array.isArray(data) ? data : data.shipments || [];
+    return rawList.sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.dispatchTime || 0).getTime();
+      const timeB = new Date(b.createdAt || b.dispatchTime || 0).getTime();
+      return timeB - timeA;
+    });
   }
 
   public async getShipmentById(id: string): Promise<Shipment | undefined> {
@@ -90,7 +95,12 @@ class DataService {
 
   public async getShipmentsByBusiness(businessId: string): Promise<Shipment[]> {
     const data = await apiClient.get('/shipments');
-    return Array.isArray(data) ? data : data.shipments || [];
+    const rawList: Shipment[] = Array.isArray(data) ? data : data.shipments || [];
+    return rawList.sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.dispatchTime || 0).getTime();
+      const timeB = new Date(b.createdAt || b.dispatchTime || 0).getTime();
+      return timeB - timeA;
+    });
   }
 
   public async createShipment(data: {
@@ -139,7 +149,13 @@ class DataService {
   // Clusters & Routes
   public async getClusters(): Promise<ConsolidationCluster[]> {
     const res = await apiClient.get('/clusters');
-    return Array.isArray(res) ? res : res.clusters || [];
+    const rawList: ConsolidationCluster[] = Array.isArray(res) ? res : res.clusters || [];
+    return rawList.sort((a, b) => {
+      const timeA = new Date((a as any).createdAt || 0).getTime();
+      const timeB = new Date((b as any).createdAt || 0).getTime();
+      if (timeA !== timeB) return timeB - timeA;
+      return b.id.localeCompare(a.id);
+    });
   }
 
   public async getClusterById(id: string): Promise<ConsolidationCluster | undefined> {

@@ -26,7 +26,8 @@ export const getShipments = async (req: Request, res: Response, next: NextFuncti
       shipment: shipments,
       business: businesses,
     }).from(shipments)
-      .leftJoin(businesses, eq(shipments.businessId, businesses.id));
+      .leftJoin(businesses, eq(shipments.businessId, businesses.id))
+      .orderBy(desc(shipments.createdAt));
 
     if (userRole === 'business') {
       if (!businessId) {
