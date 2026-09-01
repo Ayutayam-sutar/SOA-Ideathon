@@ -743,7 +743,8 @@ const confirmAiPlan = async (planId: string) => {
                               <span className={`whitespace-nowrap px-2.5 py-1 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider ${
                                 shipment.status === 'in_transit' ? 'bg-[#5C7A50]/10 text-[#5C7A50] border border-[#5C7A50]/20' : 
                                 shipment.status === 'pending' ? 'bg-[#D98E2B]/10 text-[#D98E2B] border border-[#D98E2B]/20' :
-                                shipment.status === 'disrupted' ? 'bg-red-50 text-red-700 border border-red-200' : 
+                                shipment.status === 'approved' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                                (shipment.status === 'disrupted' || shipment.status === 'rejected') ? 'bg-red-50 text-red-700 border border-red-200' : 
                                 shipment.status === 'delivered' ? 'bg-gray-100 text-gray-700 border border-gray-200' : 'bg-[#D98E2B]/10 text-[#D98E2B] border border-[#D98E2B]/20'
                               }`}>
                                 {shipment.status.replace('_', ' ')}
@@ -774,7 +775,8 @@ const confirmAiPlan = async (planId: string) => {
                           <span className={`whitespace-nowrap px-2.5 py-1 rounded-md text-[9px] font-mono font-bold uppercase tracking-wider ${
                             shipment.status === 'in_transit' ? 'bg-[#5C7A50]/10 text-[#5C7A50] border border-[#5C7A50]/20' : 
                             shipment.status === 'pending' ? 'bg-[#D98E2B]/10 text-[#D98E2B] border border-[#D98E2B]/20' :
-                            shipment.status === 'disrupted' ? 'bg-red-50 text-red-700 border border-red-200' : 
+                            shipment.status === 'approved' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                            (shipment.status === 'disrupted' || shipment.status === 'rejected') ? 'bg-red-50 text-red-700 border border-red-200' : 
                             shipment.status === 'delivered' ? 'bg-gray-100 text-gray-700 border border-gray-200' : 'bg-[#D98E2B]/10 text-[#D98E2B] border border-[#D98E2B]/20'
                           }`}>
                             {shipment.status.replace('_', ' ')}

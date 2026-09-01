@@ -121,7 +121,7 @@ export const AdminRoutes: React.FC = () => {
                 : "bg-[#FFFFFF] text-[#596560] border-[#D6DCD4] hover:border-[#163832]"
             }`}
           >
-            <span>{route.code}</span>
+            <span>Route: {route.code}</span>
 
             <span className="ml-2 text-[10px] opacity-80">
               (
@@ -162,9 +162,17 @@ export const AdminRoutes: React.FC = () => {
             </div>
 
             <div className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm space-y-3">
-              <h4 className="font-display font-bold text-sm text-[#163832]">
-                Ordered Stops & Hub Handshakes
-              </h4>
+              <div className="flex justify-between items-center">
+                <h4 className="font-display font-bold text-sm text-[#163832]">
+                  Ordered Stops & Waypoints
+                </h4>
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                  Multi-Stop Enabled
+                </span>
+              </div>
+              <p className="text-[11px] text-[#596560] leading-snug">
+                Route includes dynamic intermediate drops (e.g. Balasore/Bhadrak) to distribute partial cargo loads while maintaining the cold chain.
+              </p>
 
               <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                 {selectedRoute.stops.map((stop) => (

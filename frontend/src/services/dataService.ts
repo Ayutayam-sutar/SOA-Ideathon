@@ -121,7 +121,15 @@ class DataService {
   }
 
   public async approveShipment(shipmentId: string): Promise<void> {
-    return apiClient.patch(`/shipments/${shipmentId}`, { status: 'in_transit' });
+    return apiClient.patch(`/shipments/${shipmentId}`, { status: 'approved' });
+  }
+
+  public async rejectShipment(shipmentId: string, reason: string): Promise<void> {
+    return apiClient.patch(`/shipments/${shipmentId}`, { status: 'rejected', rejectionReason: reason });
+  }
+
+  public async assignVehicle(shipmentId: string, vehicleId: string): Promise<void> {
+    return apiClient.patch(`/shipments/${shipmentId}`, { status: 'in_transit', assignedVehicle: vehicleId });
   }
 
   // Clusters & Routes

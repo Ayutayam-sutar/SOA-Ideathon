@@ -264,7 +264,7 @@ export const updateShipment = async (req: Request, res: Response, next: NextFunc
     const {
       cargoType, targetTempMin, targetTempMax, totalShelfLifeHours,
       weightKg, volumeCbm, slaMaxDeliveryHours, slaMaxSpoilagePercent, slaPriority,
-      origin, destination, status
+      origin, destination, status, rejectionReason, assignedVehicle
     } = req.body;
 
     const updates: any = {};
@@ -291,6 +291,8 @@ export const updateShipment = async (req: Request, res: Response, next: NextFunc
     if (slaMaxSpoilagePercent !== undefined) updates.slaMaxSpoilagePercent = Number(slaMaxSpoilagePercent);
     if (slaPriority !== undefined) updates.slaPriority = slaPriority;
     if (status !== undefined) updates.status = status;
+    if (rejectionReason !== undefined) updates.rejectionReason = rejectionReason;
+    if (assignedVehicle !== undefined) updates.assignedVehicle = assignedVehicle;
 
     // Reject empty updates map
     if (Object.keys(updates).length === 0) {
