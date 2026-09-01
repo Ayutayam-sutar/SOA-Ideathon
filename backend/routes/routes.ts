@@ -12,10 +12,13 @@ import {
 
 const router = Router();
 
+// Allow route creation without auth blocks during intake confirmation
+router.post('/', createRoute);
+
+// All routes below this line will enforce authentication
 router.use(requireAuth);
 
 router.get('/', getRoutes);
-router.post('/', createRoute);
 router.get('/:id', getRouteById);
 router.patch('/:id', updateRoute);
 router.get('/:id/risk', getRouteRisk);

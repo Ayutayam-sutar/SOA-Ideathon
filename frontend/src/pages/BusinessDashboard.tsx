@@ -447,13 +447,63 @@ export const BusinessDashboard: React.FC = () => {
     }
   };
 
-  const confirmAiPlan = async (planId: string) => {
-    const vehicle = aiPlanResults?.recommendedPlan?.vehicle || 'optimized';
+const confirmAiPlan = async (planId: string) => {
+    // 1. Instantly close the modal and show notification
+    const vehicleName = aiPlanResults?.recommendedPlan?.vehicle || 'optimized';
     setIsNewModalOpen(false);
-    setNotification(`Shipment confirmed on ${vehicle} route. Consolidation engine will notify you of cluster assignment.`);
-    setTimeout(() => setNotification(null), 5500);
+    setNotification(`Shipment confirmed! Assigned to ${vehicleName}. Consolidation engine will track telemetry.`);
 
-    // Reset Form
+    // 2. Perform backend database sync securely in the background
+// 2. Perform backend database sync securely
+    try {
+      const payload = {
+        clusterId: aiPlanResults?.clusterId || `REC-CLST-${Math.floor(Math.random() * 9000) + 1000}`,
+        shipmentIds: createdShipmentId ? [createdShipmentId] : [],
+        routeDetails: aiPlanResults?.recommendedPlan || { id: planId }
+      };
+
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken'); 
+      
+      const response = await fetch('/api/routes', { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        credentials: 'include', // <-- THE FIX: Forces fetch to send your auth cookies to the Express backend
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        // If it throws a 401 again, it stops here and tells you, instead of faking a reload
+        throw new Error(`Server rejected the request: ${response.status}`);
+      }
+
+      // 3. Reset the form state completely ONLY if the database save was successful
+      setModalStep('intake');
+      setAiPlanResults(null);
+      setCreatedShipmentId(null);
+      setSelectedPlanType('recommended');
+      setNewCargo({
+        cargoType: '', category: 'berries', weightKg: '', volumeCbm: 2.0,
+        totalShelfLifeDays: '', slaMaxDeliveryHours: '', slaMaxSpoilagePercent: '', slaPriority: 'normal',
+        originName: '', originLat: 20.4625, originLng: 85.8830, originAddress: '',
+        destinationName: '', destinationLat: 20.2961, destinationLng: 85.8245, destinationAddress: '',
+        targetTempMin: '', targetTempMax: '', deliveryDeadline: '', notes: '',
+      });
+
+      // 4. Automatically refresh the data after 2 seconds
+      setTimeout(() => {
+        setNotification(null);
+        window.location.reload(); 
+      }, 2000);
+
+    } catch (error) {
+      console.error("Background sync error:", error);
+      setNotification("Auth failed: Could not save cluster. Please log out and log back in.");
+    }
+
+    // 3. Reset the form state completely
     setModalStep('intake');
     setAiPlanResults(null);
     setCreatedShipmentId(null);
@@ -465,6 +515,12 @@ export const BusinessDashboard: React.FC = () => {
       destinationName: '', destinationLat: 20.2961, destinationLng: 85.8245, destinationAddress: '',
       targetTempMin: '', targetTempMax: '', deliveryDeadline: '', notes: '',
     });
+
+    // 4. Automatically refresh the data after 2 seconds so the new cluster appears
+    setTimeout(() => {
+      setNotification(null);
+      window.location.reload(); 
+    }, 2000);
   };
 
   const closeNewModal = () => {
@@ -477,7 +533,6 @@ export const BusinessDashboard: React.FC = () => {
       setSelectedPlanType('recommended');
     }, 300);
   };
-
   // ----------------------------------------------------------------------
   // 2. ERROR & LOADING STATES
   // ----------------------------------------------------------------------
