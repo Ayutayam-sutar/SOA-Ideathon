@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../db';
-import { deliveryRoutes, routeLegs, consolidationClusters, clusterShipments, shipments } from '../db/schema';
+import { deliveryRoutes, routeLegs, consolidationClusters, clusterShipments, shipments, vehicles } from '../db/schema';
 import { eq, asc, and, inArray } from 'drizzle-orm';
 import { riskPredictionService } from '../services/riskPrediction';
 import { explanationService } from '../services/explanationService';
@@ -277,7 +277,66 @@ export const getRouteById = async (req: Request, res: Response, next: NextFuncti
 };
 
 export const createRoute = async (req: Request, res: Response, next: NextFunction) => {
-  res.status(501).json({ error: 'Route creation handled dynamically by consolidationEngine' });
+  try {
+    // 1. Destructure the payload sent from the "Confirm AI Plan" button
+    const { clusterId, shipmentIds, routeDetails } = req.body;
+
+    if (!clusterId || !shipmentIds || !routeDetails) {
+      return res.status(400).json({ error: 'Missing required AI plan data from frontend' });
+    }
+
+    // 2. Save the Cluster
+    await db.insert(consolidationClusters).values({
+      id: clusterId,
+      status: 'scheduled',
+      costSavingsPercent: routeDetails.costSavingsPercent || 36,
+      co2SavedKg: routeDetails.co2SavedKg || 37.0
+    }).onConflictDoNothing();
+
+    // 3. Map the Shipments to this Cluster (Safety check added here)
+    if (shipmentIds && shipmentIds.length > 0) {
+      const mappings = shipmentIds.map((id: string) => ({ clusterId, shipmentId: id }));
+      await db.insert(clusterShipments).values(mappings).onConflictDoNothing();
+    }
+
+    // 4. Find and Assign an Actual Vehicle (Truck) from your DB
+    const allVehicles = await db.select().from(vehicles);
+    // Prioritize heavy reefers for clusters, or grab the first available truck
+    let assignedVehicle = allVehicles.find(v => v.vehicleType.toLowerCase().includes('heavy')) || allVehicles[0];
+
+    // 5. Save the Delivery Route
+    const routeId = routeDetails.id || `RT-${clusterId.replace('CLST-', '')}`;
+    await db.insert(deliveryRoutes).values({
+      id: routeId,
+      clusterId: clusterId,
+      status: 'scheduled',
+      totalCost: routeDetails.cost || 805
+    }).onConflictDoNothing();
+
+    // 6. Save the Route Legs with the Assigned Truck ID
+    if (routeDetails.legs && routeDetails.legs.length > 0) {
+      const legsToInsert = routeDetails.legs.map((leg: any, index: number) => ({
+        id: `LEG-${routeId}-${index + 1}`,
+        routeId: routeId,
+        sequence: index + 1,
+        mode: leg.mode || 'road_reefer',
+        origin: leg.originName || leg.origin,
+        destination: leg.destinationName || leg.destination,
+        vehicleId: assignedVehicle.id // <-- This links the physical truck to the route!
+      }));
+      await db.insert(routeLegs).values(legsToInsert).onConflictDoNothing();
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'AI Plan Confirmed & Truck Assigned', 
+      routeId, 
+      assignedTruck: assignedVehicle 
+    });
+
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const updateRoute = async (req: Request, res: Response, next: NextFunction) => {
