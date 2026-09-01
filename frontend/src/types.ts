@@ -53,6 +53,22 @@ export interface GeoLocation {
   hubCode?: string;
 }
 
+export interface Hub {
+  id: string;
+  name: string;
+  city: string;
+  roadAccess: number;
+  railAccess: number;
+  coldStorage: number;
+  reeferCrossDock: number;
+  capacityKg: number;
+  latitude: number;
+  longitude: number;
+  handlingCostPerKg: number;
+  coldStorageCostPerKgHr: number;
+  hubCode?: string;
+}
+
 export interface Shipment {
   id: string;
   code: string; // e.g. "SHP-8821"

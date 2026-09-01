@@ -11,8 +11,6 @@ import {
   ChevronRight,
   Menu,
   X,
-  UserPlus,
-  UserCheck,
   LogOut,
 } from 'lucide-react';
 import { useAuth } from "../contexts/AuthContext";
@@ -42,7 +40,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login', { replace: true });
+      navigate('/', { replace: true });
     } catch (error) {
       console.error("Logout failed:", error);
     }
@@ -57,11 +55,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     { path: '/admin/map', label: 'Network Map', description: 'Live logistics network', icon: Map },
   ];
 
-  const accountRequests = [
-    { path: '/admin/shipper-requests', label: 'Shipper Requests', description: 'New registrations', icon: UserPlus },
-    // { path: '/admin/agent-requests', label: 'Agent Requests', description: 'New driver approvals', icon: UserCheck },
-  ];
-
   const isActive = (path: string) => {
     if (path === '/admin') return location.pathname === '/admin';
     return location.pathname.startsWith(path);
@@ -74,7 +67,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
   return (
     <>
-      {/* Mobile menu button - sits in the empty space of the AppHeader */}
+      {/* Mobile menu button */}
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
@@ -94,7 +87,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       {/* Sidebar Container */}
       <aside
         className={`
-          fixed left-0 top-0 z-[80] flex flex-col
+          fixed left-0 top-0 z-[80] flex flex-col justify-between
           border-r border-[#E0E5DE] bg-[#F7F9F5] shadow-[4px_0_24px_rgba(0,0,0,0.02)]
           transition-all duration-300 ease-out 
           h-screen lg:sticky lg:top-0 lg:z-40 lg:h-[calc(100vh-5rem)] 
@@ -102,17 +95,16 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >
-        
-        {/* Desktop collapse button - Perfectly aligned with the "Operations" text padding */}
+        {/* Desktop collapse button */}
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className="absolute -right-3 top-6 hidden h-6 w-6 items-center justify-center rounded-full border border-[#D6DCD4] bg-white text-[#596560] shadow-md transition-all hover:border-[#163832] hover:text-[#163832] hover:scale-110 lg:flex z-50"
+          className="absolute -right-3 top-6 hidden h-6 w-6 items-center justify-center rounded-full border border-[#D6DCD4] bg-white text-[#596560] shadow-md transition-all hover:border-[#163832] hover:text-[#163832] hover:scale-110 lg:flex z-50 cursor-pointer"
         >
           {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
         </button>
 
-        {/* Mobile-Only Header - Gives the drawer a polished look on phones */}
+        {/* Mobile-Only Header */}
         <div className="flex h-16 items-center justify-between border-b border-[#E0E5DE] px-5 lg:hidden bg-white shrink-0">
           <span className="font-display text-lg font-extrabold text-[#163832]">KARWAAN</span>
           <button
@@ -144,7 +136,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                   onClick={() => handleNavigation(item.path)}
                   title={collapsed ? item.label : undefined}
                   className={`
-                    group relative flex w-full items-center rounded-xl text-left transition-all duration-200
+                    group relative flex w-full items-center rounded-xl text-left transition-all duration-200 cursor-pointer
                     ${collapsed ? 'justify-center p-3' : 'gap-3 px-3.5 py-3'}
                     ${active 
                       ? item.danger 
@@ -156,7 +148,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                     }
                   `}
                 >
-                  {/* Active Indicator Strip */}
                   {active && (
                     <span className={`absolute left-0 top-1/2 h-7 w-[4px] -translate-y-1/2 rounded-r-full ${item.danger ? 'bg-[#B3462C]' : 'bg-[#D98E2B]'}`} />
                   )}
@@ -193,46 +184,11 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               );
             })}
           </div>
-
-          {/* Account Requests */}
-          {!collapsed && (
-            <div className="mb-3 mt-8 px-2 font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-[#89938E]">
-              Account Requests
-            </div>
-          )}
-
-          <div className="space-y-1.5 mt-2">
-            {accountRequests.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.path);
-
-              return (
-                <button
-                  key={item.path}
-                  type="button"
-                  onClick={() => handleNavigation(item.path)}
-                  title={collapsed ? item.label : undefined}
-                  className={`group relative flex w-full items-center rounded-xl text-left transition-all duration-200 ${collapsed ? 'justify-center p-3' : 'gap-3 px-3.5 py-3'} ${active ? 'bg-gradient-to-r from-[#163832] to-[#1D4A42] text-white shadow-md' : 'text-[#596560] hover:bg-white hover:text-[#163832] hover:shadow-sm border border-transparent hover:border-[#E0E5DE]'}`}
-                >
-                  {active && <span className="absolute left-0 top-1/2 h-7 w-[4px] -translate-y-1/2 rounded-r-full bg-[#D98E2B]" />}
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all ${active ? 'bg-white/10' : 'bg-[#E9EEE8] group-hover:bg-[#DCE7DC]'}`}>
-                    <Icon className={`h-[18px] w-[18px] ${active ? 'text-white' : 'text-[#596560] group-hover:text-[#163832]'}`} />
-                  </div>
-                  {!collapsed && (
-                    <div className="min-w-0 flex-1">
-                      <div className={`truncate text-[13px] font-semibold tracking-wide ${active ? 'font-bold' : ''}`}>{item.label}</div>
-                      <div className={`mt-0.5 truncate text-[10px] ${active ? 'text-white/70' : 'text-[#89938E]'}`}>{item.description}</div>
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
         </nav>
 
         {/* User Footer Profile */}
         <div className="shrink-0 border-t border-[#E0E5DE] bg-white p-4">
-          <div className={`flex items-center rounded-2xl border border-[#E0E5DE] bg-[#F7F9F5] hover:bg-[#F0F4EF] transition-colors cursor-pointer ${collapsed ? 'justify-center p-2' : 'gap-3 p-3'}`}>
+          <div className={`flex items-center rounded-2xl border border-[#E0E5DE] bg-[#F7F9F5] hover:bg-[#F0F4EF] transition-colors ${collapsed ? 'justify-center p-2' : 'gap-3 p-3'}`}>
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#163832] text-white font-display text-sm font-bold shadow-sm">
               {userName.split(' ').map((name) => name[0]).slice(0, 2).join('')}
             </div>
@@ -247,7 +203,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                   type="button"
                   title="Log out"
                   onClick={handleLogout}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#89938E] hover:bg-[#E5EBE3] hover:text-[#B3462C] transition-colors"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#89938E] hover:bg-[#E5EBE3] hover:text-[#B3462C] transition-colors cursor-pointer"
                 >
                   <LogOut className="h-4 w-4" />
                 </button>
