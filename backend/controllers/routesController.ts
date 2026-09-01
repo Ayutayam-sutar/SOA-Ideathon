@@ -6,6 +6,19 @@ import { riskPredictionService } from '../services/riskPrediction';
 import { explanationService } from '../services/explanationService';
 import { maskCommercialData } from '../middleware/fieldMasking';
 import { getLocationCoords, getRouteLegCoordinates, getRouteCurrentLocation } from '../services/locationHelper';
+import { updateRouteStatus } from '../services/routeCompletionService';
+
+// Safe explicit column selection to avoid 500 DB Schema errors
+const safeRouteColumns = {
+  id: deliveryRoutes.id,
+  clusterId: deliveryRoutes.clusterId,
+  status: deliveryRoutes.status,
+  totalCost: deliveryRoutes.totalCost,
+  driverAgentId: deliveryRoutes.driverAgentId,
+  vehicleId: deliveryRoutes.vehicleId,
+  name: deliveryRoutes.name,
+  createdAt: deliveryRoutes.createdAt
+};
 
 // Helper: Haversine distance in km
 function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -27,7 +40,6 @@ function buildDynamicStops(routeId: string, legs: any[], clusterShipmentIds: str
   const stops: any[] = [];
 
   legs.forEach((leg, index) => {
-    // 1. Origin Stop (Pickup / Origin Terminal)
     if (index === 0) {
       stops.push({
         id: `STOP-${routeId}-ORIGIN`,
@@ -45,7 +57,6 @@ function buildDynamicStops(routeId: string, legs: any[], clusterShipmentIds: str
       });
     }
 
-    // 2. Intermediate Waypoint / Multi-modal Transfer Stop
     if (index > 0) {
       stops.push({
         id: `STOP-${routeId}-TRANSFER-${index}`,
@@ -63,8 +74,6 @@ function buildDynamicStops(routeId: string, legs: any[], clusterShipmentIds: str
       });
     }
 
-    // 2.5 Multi-stop / Intermediate Drop Simulation
-    // If the leg is road_reefer_truck and it's Odihsa to Bengal, let's simulate intermediate drops
     if (leg.mode === 'road_reefer_truck' && leg.origin.includes('Bhubaneswar') && leg.destination.includes('Kolkata')) {
        stops.push({
          id: `STOP-${routeId}-DROP-BALASORE`,
@@ -82,7 +91,6 @@ function buildDynamicStops(routeId: string, legs: any[], clusterShipmentIds: str
        });
     }
 
-    // 3. Final Destination Stop
     if (index === legs.length - 1) {
       stops.push({
         id: `STOP-${routeId}-DEST`,
@@ -111,12 +119,11 @@ export const getRoutes = async (req: Request, res: Response, next: NextFunction)
 
     let results: any[] = [];
 
-    // 1. Enforce RBAC for Businesses
     if (userRole === 'business') {
       if (!businessId) {
         return res.status(403).json({ success: false, error: 'Business ID not linked to this account.' });
       }
-      const rawResults = await db.select({ route: deliveryRoutes })
+      const rawResults = await db.select({ route: safeRouteColumns })
         .from(deliveryRoutes)
         .innerJoin(consolidationClusters, eq(deliveryRoutes.clusterId, consolidationClusters.id))
         .innerJoin(clusterShipments, eq(consolidationClusters.id, clusterShipments.clusterId))
@@ -126,13 +133,18 @@ export const getRoutes = async (req: Request, res: Response, next: NextFunction)
       const uniqueMap = new Map();
       rawResults.forEach((r) => uniqueMap.set(r.route.id, r.route));
       results = Array.from(uniqueMap.values());
+    } else if (userRole === 'agent') {
+      const agentUserId = (req as any).user.userId;
+      results = await db.select(safeRouteColumns).from(deliveryRoutes).where(eq(deliveryRoutes.driverAgentId, agentUserId));
+      if (results.length === 0) {
+        results = await db.select(safeRouteColumns).from(deliveryRoutes);
+      }
     } else {
-      results = await db.select().from(deliveryRoutes);
+      results = await db.select(safeRouteColumns).from(deliveryRoutes);
     }
 
     if (results.length === 0) return res.status(200).json([]);
 
-    // 2. Batch-Fetch Route Legs & Cluster Shipments (Eliminates N+1 DB Queries)
     const routeIds = results.map(r => r.id);
     const clusterIds = results.map(r => r.clusterId).filter(Boolean) as string[];
 
@@ -143,7 +155,6 @@ export const getRoutes = async (req: Request, res: Response, next: NextFunction)
       allClusterShipments = await db.select().from(clusterShipments).where(inArray(clusterShipments.clusterId, clusterIds));
     }
 
-    // 3. Dynamic Formatting
     const formattedRoutes = results.map((route) => {
       const legs = allLegs.filter(l => l.routeId === route.id);
       const matchingShipments = allClusterShipments.filter(cs => cs.clusterId === route.clusterId).map(cs => cs.shipmentId);
@@ -155,11 +166,11 @@ export const getRoutes = async (req: Request, res: Response, next: NextFunction)
         ...route,
         code: route.id,
         clusterName: `Cluster ${route.clusterId || 'Consolidated'}`,
-        name: `Route for ${route.clusterId || route.id}`,
-        driverAgentId: 'USR-AGENT-01',
-        driverAgentName: 'Active Fleet Pilot',
-        driverAgentPhone: '+91 94370 00199',
-        vehicleId: 'OD-02-AX-4592 (Tata 14T Reefer)',
+        name: route.name || `Route for ${route.clusterId || route.id}`,
+        driverAgentId: route.driverAgentId || 'USR-AGENT-01',
+        driverAgentName: 'Active Fleet Pilot', 
+        driverAgentPhone: '+91 94370 00199',   
+        vehicleId: route.vehicleId || 'OD-02-AX-4592 (Tata 14T Reefer)',
         currentLocation: locInfo.currentLocation,
         currentLocationName: locInfo.currentLocationName || 'Odisha Highway Corridor',
         lastUpdated: route.createdAt,
@@ -174,7 +185,6 @@ export const getRoutes = async (req: Request, res: Response, next: NextFunction)
           const destinationCoords = getLocationCoords(l.destination);
           const coordinates = getRouteLegCoordinates(route.id, l.sequence, l.origin, l.destination);
 
-          // Real distance based on coordinates
           const realDistanceKm = calculateDistanceKm(originCoords[0], originCoords[1], destinationCoords[0], destinationCoords[1]);
           const avgSpeed = l.mode === 'rail_cold_wagon' ? 55 : 45;
           const realDurationHours = Number((realDistanceKm / avgSpeed).toFixed(1));
@@ -213,12 +223,11 @@ export const getRouteById = async (req: Request, res: Response, next: NextFuncti
     const userRole = (req as any).user.role;
     const businessId = (req as any).user.businessId;
 
-    const result = await db.select().from(deliveryRoutes).where(eq(deliveryRoutes.id, id)).limit(1);
+    const result = await db.select(safeRouteColumns).from(deliveryRoutes).where(eq(deliveryRoutes.id, id)).limit(1);
     if (result.length === 0) return res.status(404).json({ error: 'Route not found' });
 
     const route = result[0];
 
-    // Verify ownership for business role
     if (userRole === 'business') {
       if (!businessId || !route.clusterId) return res.status(403).json({ error: 'Forbidden' });
 
@@ -247,10 +256,10 @@ export const getRouteById = async (req: Request, res: Response, next: NextFuncti
       code: route.id,
       clusterName: `Cluster ${route.clusterId || 'Consolidated'}`,
       name: `Route for ${route.clusterId || route.id}`,
-      driverAgentId: 'USR-AGENT-01',
+      driverAgentId: route.driverAgentId || 'USR-AGENT-01',
       driverAgentName: 'Active Fleet Pilot',
       driverAgentPhone: '+91 94370 00199',
-      vehicleId: 'OD-02-AX-4592 (Tata 14T Reefer)',
+      vehicleId: route.vehicleId || 'OD-02-AX-4592 (Tata 14T Reefer)',
       currentLocation: locInfo.currentLocation,
       currentLocationName: locInfo.currentLocationName || 'Odisha Highway Corridor',
       lastUpdated: route.createdAt,
@@ -297,14 +306,12 @@ export const getRouteById = async (req: Request, res: Response, next: NextFuncti
 
 export const createRoute = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // 1. Destructure the payload sent from the "Confirm AI Plan" button
     const { clusterId, shipmentIds, routeDetails } = req.body;
 
     if (!clusterId || !shipmentIds || !routeDetails) {
       return res.status(400).json({ error: 'Missing required AI plan data from frontend' });
     }
 
-    // 2. Save the Cluster
     await db.insert(consolidationClusters).values({
       id: clusterId,
       status: 'scheduled',
@@ -312,27 +319,31 @@ export const createRoute = async (req: Request, res: Response, next: NextFunctio
       co2SavedKg: routeDetails.co2SavedKg || 37.0
     }).onConflictDoNothing();
 
-    // 3. Map the Shipments to this Cluster (Safety check added here)
     if (shipmentIds && shipmentIds.length > 0) {
       const mappings = shipmentIds.map((id: string) => ({ clusterId, shipmentId: id }));
       await db.insert(clusterShipments).values(mappings).onConflictDoNothing();
     }
 
-    // 4. Find and Assign an Actual Vehicle (Truck) from your DB
     const allVehicles = await db.select().from(vehicles);
-    // Prioritize heavy reefers for clusters, or grab the first available truck
     let assignedVehicle = allVehicles.find(v => v.vehicleType.toLowerCase().includes('heavy')) || allVehicles[0];
 
-    // 5. Save the Delivery Route
+    const requestingUser = (req as any).user;
+    const driverAgentId = (routeDetails.driverAgentId) ||
+      (requestingUser?.role === 'agent' ? requestingUser.userId : 'USR-AGENT-01');
+
     const routeId = routeDetails.id || `RT-${clusterId.replace('CLST-', '')}`;
+    
+    // Omitted missing schema fields from the insert payload
     await db.insert(deliveryRoutes).values({
       id: routeId,
       clusterId: clusterId,
       status: 'scheduled',
-      totalCost: routeDetails.cost || 805
+      totalCost: routeDetails.cost || 805,
+      driverAgentId,
+      vehicleId: assignedVehicle?.id || 'VEH-001',
+      name: routeDetails.name || `Route for ${clusterId}`,
     }).onConflictDoNothing();
 
-    // 6. Save the Route Legs with the Assigned Truck ID
     if (routeDetails.legs && routeDetails.legs.length > 0) {
       const legsToInsert = routeDetails.legs.map((leg: any, index: number) => ({
         id: `LEG-${routeId}-${index + 1}`,
@@ -341,7 +352,7 @@ export const createRoute = async (req: Request, res: Response, next: NextFunctio
         mode: leg.mode || 'road_reefer',
         origin: leg.originName || leg.origin,
         destination: leg.destinationName || leg.destination,
-        vehicleId: assignedVehicle.id // <-- This links the physical truck to the route!
+        vehicleId: assignedVehicle.id 
       }));
       await db.insert(routeLegs).values(legsToInsert).onConflictDoNothing();
     }
@@ -358,12 +369,36 @@ export const createRoute = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
+export const completeRoute = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { lat, lng } = req.body; 
+    const userRole = (req as any).user?.role;
+
+    const routeRows = await db.select(safeRouteColumns).from(deliveryRoutes).where(eq(deliveryRoutes.id, id)).limit(1);
+    if (routeRows.length === 0) return res.status(404).json({ error: 'Route not found' });
+
+    if (userRole === 'agent') {
+      const agentUserId = (req as any).user.userId;
+      const route = routeRows[0];
+      if (route.driverAgentId && route.driverAgentId !== agentUserId) {
+        return res.status(403).json({ error: 'Forbidden. This route is not assigned to you.' });
+      }
+    }
+
+    const result = await updateRouteStatus(id, lat, lng);
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const updateRoute = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
     const { status, totalCost } = req.body;
 
-    const existing = await db.select().from(deliveryRoutes).where(eq(deliveryRoutes.id, id)).limit(1);
+    const existing = await db.select(safeRouteColumns).from(deliveryRoutes).where(eq(deliveryRoutes.id, id)).limit(1);
     if (existing.length === 0) return res.status(404).json({ error: 'Route not found' });
 
     const updateFields: any = {};
@@ -381,7 +416,7 @@ export const updateRoute = async (req: Request, res: Response, next: NextFunctio
 export const reoptimizeRoute = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
-    const result = await db.select().from(deliveryRoutes).where(eq(deliveryRoutes.id, id)).limit(1);
+    const result = await db.select(safeRouteColumns).from(deliveryRoutes).where(eq(deliveryRoutes.id, id)).limit(1);
     if (result.length === 0) return res.status(404).json({ error: 'Route not found' });
 
     res.status(200).json({ success: true, message: `Route ${id} successfully re-evaluated against live telemetry.` });
@@ -404,7 +439,7 @@ export const explainRoute = async (req: Request, res: Response, next: NextFuncti
   try {
     const id = req.params.id as string;
 
-    const result = await db.select().from(deliveryRoutes).where(eq(deliveryRoutes.id, id)).limit(1);
+    const result = await db.select(safeRouteColumns).from(deliveryRoutes).where(eq(deliveryRoutes.id, id)).limit(1);
     if (result.length === 0) return res.status(404).json({ error: 'Route not found' });
     const route = result[0];
 
@@ -416,5 +451,4 @@ export const explainRoute = async (req: Request, res: Response, next: NextFuncti
   } catch (error) {
     next(error);
   }
-  
 };

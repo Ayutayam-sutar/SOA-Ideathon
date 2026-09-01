@@ -27,6 +27,8 @@ export const AdminClusters: React.FC = () => {
   const [recommendedClusters, setRecommendedClusters] = useState<ConsolidationCluster[]>([]);
   const [clusterDetails, setClusterDetails] = useState<Record<string, { aiRoute: any, depTime: any }>>({});
   const [isGenerating, setIsGenerating] = useState(false);
+  const [dispatchingClusterId, setDispatchingClusterId] = useState<string | null>(null);
+  const [dispatchSuccess, setDispatchSuccess] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -69,6 +71,46 @@ export const AdminClusters: React.FC = () => {
     }
   }, [showRecommendations, shipments]);
 
+
+  const handleDispatchCluster = async (cluster: ConsolidationCluster) => {
+    try {
+      setDispatchingClusterId(cluster.id);
+
+      // Aggregate total weight from approved consolidated shipments
+      const clusterShipments = shipments.filter(s => cluster.shipmentIds.includes(s.id));
+      const calculatedWeight = clusterShipments.reduce((sum, s) => sum + (s.weightKg || 0), 0);
+      const totalWeightKg = calculatedWeight > 0 ? calculatedWeight : (cluster.totalWeightKg || 1000);
+
+      const assignedVehicleId = 'OD-02-AX-4592 (Tata 14T Reefer)';
+
+      // 1. Assign vehicle to all shipments in the cluster
+      await Promise.all(
+        cluster.shipmentIds.map((shipmentId: string) =>
+          dataService.assignVehicle(shipmentId, assignedVehicleId)
+        )
+      );
+
+      // 2. Refresh cluster and shipment datasets
+      const [updatedClusters, updatedShipments] = await Promise.all([
+        dataService.getClusters(),
+        dataService.getShipments()
+      ]);
+      setClusters(updatedClusters);
+      setShipments(updatedShipments);
+
+      setDispatchSuccess(`Cluster ${cluster.code || cluster.id} (${totalWeightKg} kg) dispatched successfully! Reefer fleet en route.`);
+      
+      setTimeout(() => {
+        setDispatchSuccess(null);
+        setSelectedClusterId("");
+      }, 2500);
+    } catch (err: any) {
+      console.error("Failed to dispatch fleet:", err);
+      alert('Failed to dispatch fleet: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setDispatchingClusterId(null);
+    }
+  };
 
   const selectedCluster = selectedClusterId ? (
     clusters.find(
@@ -305,6 +347,28 @@ export const AdminClusters: React.FC = () => {
                   </button>
                 )}
                 <button 
+                  onClick={() => selectedCluster && handleDispatchCluster(selectedCluster)}
+                  disabled={dispatchingClusterId === selectedCluster.id}
+                  id="dispatch-btn"
+                  className={`px-4 py-2 text-white rounded-lg text-xs font-mono font-semibold transition-all shadow-sm flex items-center gap-2 ${
+                    dispatchingClusterId === selectedCluster.id
+                      ? 'bg-emerald-700 cursor-not-allowed opacity-90'
+                      : 'bg-emerald-600 hover:bg-emerald-700 active:scale-95'
+                  }`}
+                >
+                  {dispatchingClusterId === selectedCluster.id ? (
+                    <>
+                      <svg className="animate-spin h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                      </svg>
+                      Dispatching...
+                    </>
+                  ) : (
+                    'Dispatch Fleet 🚚'
+                  )}
+                </button>
+                <button 
                   onClick={() => setSelectedClusterId("")}
                   className="text-gray-400 hover:text-gray-600 transition-colors bg-gray-100 hover:bg-gray-200 rounded-full p-2"
                 >
@@ -312,6 +376,13 @@ export const AdminClusters: React.FC = () => {
                 </button>
               </div>
             </div>
+
+            {dispatchSuccess && (
+              <div className="bg-emerald-50 border-b border-emerald-200 px-6 py-3 text-xs font-mono text-emerald-800 flex items-center gap-2 animate-in fade-in">
+                <span>✅</span>
+                <span>{dispatchSuccess}</span>
+              </div>
+            )}
 
             <div className="p-6 overflow-y-auto bg-gray-50 flex-1">
               {/* Route & Multi-stop Information Header */}

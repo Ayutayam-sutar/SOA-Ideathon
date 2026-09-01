@@ -58,7 +58,7 @@ export const AdminShipments: React.FC = () => {
         ? true 
         : shipment.status === statusFilter;
 
-    return matchesSearch && matchesRisk && matchesStatus;
+    return matchesSearch && matchesRisk && matchesStatus && shipment.status !== 'draft';
   });
 
   return (

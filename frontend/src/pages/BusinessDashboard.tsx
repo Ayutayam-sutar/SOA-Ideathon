@@ -4,8 +4,10 @@ import { AppHeader } from '../components/AppHeader';
 import { KarwaanMap } from '../components/KarwaanMap';
 import { MapLegend } from '../components/MapLegend';
 import { FreshnessGauge } from '../components/FreshnessGauge';
+import { CargoAutocomplete, detectCategoryFromCargo, CargoSuggestion } from '../components/CargoAutocomplete';
+import { LocationSelect } from '../components/LocationSelect';
 import { dataService } from '../services/dataService';
-import { Shipment, BusinessEntity, User, PerishableCategory } from '../types';
+import { Shipment, BusinessEntity, User, PerishableCategory, Hub } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Plus,
@@ -157,15 +159,25 @@ const EngineProcessingView: React.FC<{
   const dist = getEstimateDistance(origin, destination);
   const [activeStep, setActiveStep] = useState(0);
 
-  const roadCost = Math.round(dist * 35);
+  const w = Number(weightKg) || 1000;
+  
+  // Real backend economics
+  const estimatedSoloCostINR = Math.round(dist * 35 + w * 2);
+  const savingsFactor = 0.15 + (Math.min(dist, 2000) / 2000) * 0.20;
+  const consolidatedCostINR = Math.round(estimatedSoloCostINR * (1 - savingsFactor));
+
+  // Options displayed in the Engine telemetry
+  const roadCost = estimatedSoloCostINR;
   const roadDur = Number((dist / 45).toFixed(1));
-  const multiCost = Math.round(dist * 18 + 4000);
+  
+  const multiCost = consolidatedCostINR;
   const multiDur = Number(((dist - 40) / 60 + 3.5).toFixed(1));
-  const expressCost = Math.round(dist * 58);
+  
+  const expressCost = Math.round(estimatedSoloCostINR * 1.4);
   const expressDur = Number((dist / 65).toFixed(1));
 
   const roadScore = (0.6 + (dist % 80) / 1000).toFixed(3);
-  const multiScore = (0.5 + (dist % 50) / 1000).toFixed(3);
+  const multiScore = (0.3 + (dist % 50) / 1000).toFixed(3); // Lower score is better
   const expressScore = (0.7 + (dist % 120) / 1000).toFixed(3);
 
   const terminalLogs = [
@@ -285,11 +297,11 @@ export const BusinessDashboard: React.FC = () => {
   // ----------------------------------------------------------------------
   // 1. DATA & STATE (UNTOUCHED TO PRESERVE BACKEND CONNECTIONS)
   // ----------------------------------------------------------------------
-  const { hasAccess } = useAuth();
-  const [user, setUser] = useState<User | null>(null);
+  const { user: authUser, hasAccess } = useAuth();
+  const [user, setUser] = useState<User | null>(authUser);
   const navigate = useNavigate();
   const [businesses, setBusinesses] = useState<BusinessEntity[]>([]);
-  const [currentBizId, setCurrentBizId] = useState<string>('');
+  const [currentBizId, setCurrentBizId] = useState<string>(authUser?.businessId || '');
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const detailsPanelRef = useRef<HTMLDivElement>(null);
@@ -308,6 +320,7 @@ export const BusinessDashboard: React.FC = () => {
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [isCategoryDirty, setIsCategoryDirty] = useState(false);
+  const [availableHubs, setAvailableHubs] = useState<Hub[]>([]);
 
   const [newCargo, setNewCargo] = useState({
     cargoType: '',
@@ -336,16 +349,68 @@ export const BusinessDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Cargo selection handler for autocomplete
+  const handleCargoSuggestionSelect = (item: CargoSuggestion) => {
+    setIsCategoryDirty(false);
+    setNewCargo(prev => ({
+      ...prev,
+      cargoType: item.name,
+      category: item.category,
+      targetTempMin: item.defaultTempMin,
+      targetTempMax: item.defaultTempMax,
+      totalShelfLifeDays: item.defaultShelfLifeDays,
+    }));
+  };
+
+  // Cargo text change handler with smart category matching
+  const handleCargoTextChange = (text: string) => {
+    const detected = detectCategoryFromCargo(text);
+    setNewCargo(prev => {
+      const updated = { ...prev, cargoType: text };
+      if (detected && !isCategoryDirty) {
+        updated.category = detected.category;
+        if (prev.targetTempMin === '') updated.targetTempMin = detected.defaultTempMin;
+        if (prev.targetTempMax === '') updated.targetTempMax = detected.defaultTempMax;
+        if (prev.totalShelfLifeDays === '') updated.totalShelfLifeDays = detected.defaultShelfLifeDays;
+      }
+      return updated;
+    });
+  };
+
+  // Location select handlers
+  const handleOriginSelect = (hubName: string, hub?: Hub) => {
+    setNewCargo(prev => ({
+      ...prev,
+      originName: hubName,
+      originLat: hub ? hub.latitude : (LOCATION_COORDS[hubName.toLowerCase()]?.[0] || prev.originLat),
+      originLng: hub ? hub.longitude : (LOCATION_COORDS[hubName.toLowerCase()]?.[1] || prev.originLng),
+      originAddress: hub ? `${hub.name}, ${hub.city} Cold Facility` : `${hubName}, Cargo Terminal`
+    }));
+  };
+
+  const handleDestinationSelect = (hubName: string, hub?: Hub) => {
+    setNewCargo(prev => ({
+      ...prev,
+      destinationName: hubName,
+      destinationLat: hub ? hub.latitude : (LOCATION_COORDS[hubName.toLowerCase()]?.[0] || prev.destinationLat),
+      destinationLng: hub ? hub.longitude : (LOCATION_COORDS[hubName.toLowerCase()]?.[1] || prev.destinationLng),
+      destinationAddress: hub ? `${hub.name}, ${hub.city} Distribution Terminal` : `${hubName}, Delivery Hub`
+    }));
+  };
+
+  useEffect(() => {
+    if (authUser) {
+      setUser(authUser);
+      if (authUser.businessId) setCurrentBizId(authUser.businessId);
+    }
+  }, [authUser]);
+
   useEffect(() => {
     if (!isCategoryDirty && newCargo.cargoType) {
-      const text = newCargo.cargoType.toLowerCase();
-      if (text.includes('mango')) setNewCargo(p => ({ ...p, category: 'mangoes' }));
-      else if (text.includes('berry') || text.includes('strawber')) setNewCargo(p => ({ ...p, category: 'berries' }));
-      else if (text.includes('grape')) setNewCargo(p => ({ ...p, category: 'grapes' }));
-      else if (text.includes('leaf') || text.includes('spinach')) setNewCargo(p => ({ ...p, category: 'leafy_greens' }));
-      else if (text.includes('tomato')) setNewCargo(p => ({ ...p, category: 'tomatoes' }));
-      else if (text.includes('milk') || text.includes('cheese') || text.includes('dairy')) setNewCargo(p => ({ ...p, category: 'dairy' }));
-      else if (text.includes('mushroom')) setNewCargo(p => ({ ...p, category: 'mushrooms' }));
+      const detected = detectCategoryFromCargo(newCargo.cargoType);
+      if (detected) {
+        setNewCargo(p => ({ ...p, category: detected.category }));
+      }
     }
   }, [newCargo.cargoType, isCategoryDirty]);
 
@@ -354,14 +419,27 @@ export const BusinessDashboard: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const u = await dataService.getActiveUser();
-      const b = await dataService.getBusinesses();
-      const s = await dataService.getShipments();
+      const [u, b, s, h] = await Promise.all([
+        dataService.getActiveUser(),
+        dataService.getBusinesses(),
+        dataService.getShipments(),
+        dataService.getHubs()
+      ]);
 
-      if (u) setUser(u);
+      if (u) {
+        setUser(u);
+        if (u.businessId) setCurrentBizId(u.businessId);
+      } else if (authUser) {
+        setUser(authUser);
+        if (authUser.businessId) setCurrentBizId(authUser.businessId);
+      }
       setBusinesses(b);
-      if (u?.businessId) setCurrentBizId(u.businessId);
-      else if (b.length > 0) setCurrentBizId(b[0].id);
+      setAvailableHubs(h);
+      if (!currentBizId) {
+        if (u?.businessId) setCurrentBizId(u.businessId);
+        else if (authUser?.businessId) setCurrentBizId(authUser.businessId);
+        else if (b.length > 0) setCurrentBizId(b[0].id);
+      }
       setShipments(s);
     } catch (err: any) {
       console.error("Dashboard failed to load data:", err);
@@ -376,7 +454,7 @@ export const BusinessDashboard: React.FC = () => {
   }, []);
 
   const currentBiz = businesses.find((b) => b.id === currentBizId) || businesses[0] || {} as BusinessEntity;
-  const myShipments = shipments.filter((s) => s.businessId === currentBizId);
+  const myShipments = shipments.filter((s) => (s.businessId === currentBizId || !currentBizId) && s.status !== 'draft');
 
   // Auto-select first shipment
   useEffect(() => {
@@ -425,17 +503,16 @@ export const BusinessDashboard: React.FC = () => {
         slaPriority: newCargo.slaPriority || 'normal',
         deliveryDeadline: computedDeadline,
         notes: newCargo.notes || 'Registered shipment.',
+        status: 'draft'
       });
 
-      setShipments([created, ...shipments]);
+      // Wait to add to UI until confirmed
       setCreatedShipmentId(created.id);
-      setSelectedShipment(created);
+      // We'll also need the object later to append it
+      (window as any)._tempDraftShipment = created;
 
-      // Call AI Engine with live telemetry processing display
-      const [aiResponse] = await Promise.all([
-        dataService.getAIPlan(created.id),
-        new Promise((resolve) => setTimeout(resolve, 2200))
-      ]);
+      // Call AI Engine — no artificial delay floor; cache hits return in <100ms
+      const aiResponse = await dataService.getAIPlan(created.id);
       setAiPlanResults(aiResponse);
       setModalStep('results');
       
@@ -446,61 +523,100 @@ export const BusinessDashboard: React.FC = () => {
     }
   };
 
-  const handleRecalculatePlan = async () => {
+  // Debounce ref to prevent rapid what-if clicks from firing multiple parallel requests
+  const recalculateDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleRecalculatePlan = () => {
     if (!createdShipmentId) return;
-    setIsRecalculating(true);
-    try {
-      const options = {
-        optimizationPreference: whatIfPreference,
-        slaOverrideHours: whatIfSla ? Number(whatIfSla) : undefined,
-      };
-      const aiResponse = await dataService.getAIPlan(createdShipmentId, options);
-      setPreviousAiPlanResults(aiPlanResults);
-      setAiPlanResults(aiResponse);
-      setSelectedPlanType('recommended');
-    } catch (err: any) {
-      console.error(err);
-      setModalError(err?.message || 'Failed to recalculate plan. Please try again.');
-    } finally {
-      setIsRecalculating(false);
-    }
+    // Clear any pending debounce timer from a previous rapid click
+    if (recalculateDebounceRef.current) clearTimeout(recalculateDebounceRef.current);
+
+    recalculateDebounceRef.current = setTimeout(async () => {
+      setIsRecalculating(true);
+      try {
+        const options = {
+          optimizationPreference: whatIfPreference,
+          slaOverrideHours: whatIfSla ? Number(whatIfSla) : undefined,
+        };
+        const aiResponse = await dataService.getAIPlan(createdShipmentId, options);
+        setPreviousAiPlanResults(aiPlanResults);
+        setAiPlanResults(aiResponse);
+        setSelectedPlanType('recommended');
+      } catch (err: any) {
+        console.error(err);
+        setModalError(err?.message || 'Failed to recalculate plan. Please try again.');
+      } finally {
+        setIsRecalculating(false);
+      }
+    }, 400); // 400ms debounce
   };
 
-const confirmAiPlan = async (planId: string) => {
+  const confirmAiPlan = async (planType?: string) => {
+    const effectivePlanType = planType || selectedPlanType;
+    
+    let selectedPlan: any = null;
+    if (effectivePlanType === 'recommended' || !effectivePlanType) {
+      selectedPlan = aiPlanResults?.recommendedPlan;
+    } else {
+      selectedPlan = aiPlanResults?.candidatePlans?.find((p: any) => p.type === effectivePlanType)
+        || (effectivePlanType === aiPlanResults?.recommendedPlan?.id ? aiPlanResults?.recommendedPlan : null)
+        || aiPlanResults?.recommendedPlan;
+    }
+
+    if (!selectedPlan) {
+      selectedPlan = aiPlanResults?.recommendedPlan || aiPlanResults?.candidatePlans?.[0];
+    }
+    
+    const vehicleName = selectedPlan?.vehicle || selectedPlan?.legs?.[0]?.vehicleType || aiPlanResults?.recommendedPlan?.vehicle || 'Optimized Reefer';
+    const agreedCost = selectedPlan?.cost != null ? Math.round(selectedPlan.cost) : aiPlanResults?.recommendedPlan?.cost;
+
     // 1. Instantly close the modal and show notification
-    const vehicleName = aiPlanResults?.recommendedPlan?.vehicle || 'optimized';
     setIsNewModalOpen(false);
     setNotification(`Shipment confirmed! Assigned to ${vehicleName}. Consolidation engine will track telemetry.`);
 
-    // 2. Perform backend database sync securely in the background
-// 2. Perform backend database sync securely
+    // 2. Perform backend database sync securely
     try {
-      const payload = {
-        clusterId: aiPlanResults?.clusterId || `REC-CLST-${Math.floor(Math.random() * 9000) + 1000}`,
-        shipmentIds: createdShipmentId ? [createdShipmentId] : [],
-        routeDetails: aiPlanResults?.recommendedPlan || { id: planId }
-      };
+      if (createdShipmentId) {
+        await dataService.confirmShipment(createdShipmentId, agreedCost);
+        
+        // Optimistically add/update in UI state immediately
+        if ((window as any)._tempDraftShipment) {
+          const finalShipment = { 
+            ...(window as any)._tempDraftShipment, 
+            status: 'pending', 
+            agreedCost: agreedCost || (window as any)._tempDraftShipment.consolidatedCostINR,
+            consolidatedCostINR: agreedCost || (window as any)._tempDraftShipment.consolidatedCostINR,
+          };
+          setShipments(prev => {
+            const exists = prev.some(s => s.id === finalShipment.id);
+            if (exists) {
+              return prev.map(s => s.id === finalShipment.id ? { ...s, status: 'pending', agreedCost: finalShipment.agreedCost } : s);
+            }
+            return [finalShipment, ...prev];
+          });
+          setSelectedShipment(finalShipment);
+          (window as any)._tempDraftShipment = null;
+        }
 
-      const token = localStorage.getItem('token') || localStorage.getItem('authToken'); 
-      
-      const response = await fetch('/api/routes', { 
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        },
-        credentials: 'include', // <-- THE FIX: Forces fetch to send your auth cookies to the Express backend
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        // If it throws a 401 again, it stops here and tells you, instead of faking a reload
-        throw new Error(`Server rejected the request: ${response.status}`);
+        // Re-fetch all shipments from database to ensure fresh data and complete consistency
+        try {
+          const freshShipments = await dataService.getShipments();
+          if (Array.isArray(freshShipments) && freshShipments.length > 0) {
+            setShipments(freshShipments);
+            const found = freshShipments.find(s => s.id === createdShipmentId);
+            if (found) {
+              setSelectedShipment(found);
+            }
+          }
+        } catch (fetchErr) {
+          console.warn("Re-fetch shipments warning:", fetchErr);
+        }
       }
 
-      // 3. Reset the form state completely ONLY if the database save was successful
+      // 3. Reset the form state completely
       setModalStep('intake');
       setAiPlanResults(null);
+      setPreviousAiPlanResults(null);
       setCreatedShipmentId(null);
       setSelectedPlanType('recommended');
       setNewCargo({
@@ -511,35 +627,15 @@ const confirmAiPlan = async (planId: string) => {
         targetTempMin: '', targetTempMax: '', deliveryDeadline: '', notes: '',
       });
 
-      // 4. Automatically refresh the data after 2 seconds
+      // 4. Auto-dismiss notification after 4 seconds
       setTimeout(() => {
         setNotification(null);
-        window.location.reload(); 
-      }, 2000);
+      }, 4000);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Background sync error:", error);
-      setNotification("Auth failed: Could not save cluster. Please log out and log back in.");
+      setNotification(`Failed to confirm shipment: ${error?.message || 'Server connection error'}`);
     }
-
-    // 3. Reset the form state completely
-    setModalStep('intake');
-    setAiPlanResults(null);
-    setCreatedShipmentId(null);
-    setSelectedPlanType('recommended');
-    setNewCargo({
-      cargoType: '', category: 'berries', weightKg: '', volumeCbm: 2.0,
-      totalShelfLifeDays: '', slaMaxDeliveryHours: '', slaMaxSpoilagePercent: '', slaPriority: 'normal',
-      originName: '', originLat: 20.4625, originLng: 85.8830, originAddress: '',
-      destinationName: '', destinationLat: 20.2961, destinationLng: 85.8245, destinationAddress: '',
-      targetTempMin: '', targetTempMax: '', deliveryDeadline: '', notes: '',
-    });
-
-    // 4. Automatically refresh the data after 2 seconds so the new cluster appears
-    setTimeout(() => {
-      setNotification(null);
-      window.location.reload(); 
-    }, 2000);
   };
 
   const closeNewModal = () => {
@@ -850,12 +946,21 @@ const confirmAiPlan = async (planId: string) => {
                 <h4 className="font-bold text-[#163832] mb-4 flex items-center gap-2 border-b border-gray-200 pb-2"><PackageOpen className="w-4 h-4 text-[#5C7A50]" /> 1. Cargo Specifications</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Cargo Description</label>
-                    <input type="text" required value={newCargo.cargoType} onChange={(e) => setNewCargo({ ...newCargo, cargoType: e.target.value })} placeholder="e.g. Alphonso Mangoes Grade A" className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-[#5C7A50]/20 focus:border-[#5C7A50] transition-shadow shadow-sm" />
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center justify-between">
+                      <span>Cargo Description</span>
+                      <span className="text-[10px] text-[#5C7A50] font-mono font-normal">AI Autocomplete</span>
+                    </label>
+                    <CargoAutocomplete
+                      value={newCargo.cargoType}
+                      onChange={handleCargoTextChange}
+                      onSelectSuggestion={handleCargoSuggestionSelect}
+                      placeholder="e.g. Alphonso Mangoes Grade A or Shimla Apples"
+                      required
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1.5">Produce Category</label>
-                    <select value={newCargo.category} onChange={(e) => { setIsCategoryDirty(true); setNewCargo({ ...newCargo, category: e.target.value as PerishableCategory }) }} className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-[#5C7A50]/20 focus:border-[#5C7A50] shadow-sm">
+                    <select value={newCargo.category} onChange={(e) => { setIsCategoryDirty(true); setNewCargo({ ...newCargo, category: e.target.value as PerishableCategory }) }} className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-[#5C7A50]/20 focus:border-[#5C7A50] shadow-sm text-sm">
                       <option value="berries">Fresh Berries / Strawberries</option>
                       <option value="mangoes">Alphonso / Tropical Fruits</option>
                       <option value="grapes">Table Grapes / Stone Fruits</option>
@@ -867,14 +972,14 @@ const confirmAiPlan = async (planId: string) => {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1.5">Weight (kg)</label>
-                    <input type="number" required min="20" max="5000" value={newCargo.weightKg} onChange={(e) => setNewCargo({ ...newCargo, weightKg: e.target.value === '' ? '' : Number(e.target.value) })} className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 font-mono focus:ring-2 focus:ring-[#5C7A50]/20 focus:border-[#5C7A50] shadow-sm" />
+                    <input type="number" required min="20" max="5000" value={newCargo.weightKg} onChange={(e) => setNewCargo({ ...newCargo, weightKg: e.target.value === '' ? '' : Number(e.target.value) })} className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 font-mono focus:ring-2 focus:ring-[#5C7A50]/20 focus:border-[#5C7A50] shadow-sm text-sm" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1.5">Target Temp Band (°C)</label>
                     <div className="flex items-center gap-2">
-                      <input type="number" step="0.5" required value={newCargo.targetTempMin} onChange={(e) => setNewCargo({ ...newCargo, targetTempMin: e.target.value === '' ? '' : Number(e.target.value) })} className="w-1/2 bg-white border border-gray-300 rounded-lg px-3 py-2.5 font-mono shadow-sm" placeholder="Min" />
+                      <input type="number" step="0.5" required value={newCargo.targetTempMin} onChange={(e) => setNewCargo({ ...newCargo, targetTempMin: e.target.value === '' ? '' : Number(e.target.value) })} className="w-1/2 bg-white border border-gray-300 rounded-lg px-3 py-2.5 font-mono shadow-sm text-sm" placeholder="Min" />
                       <span className="text-gray-400 font-medium">to</span>
-                      <input type="number" step="0.5" required value={newCargo.targetTempMax} onChange={(e) => setNewCargo({ ...newCargo, targetTempMax: e.target.value === '' ? '' : Number(e.target.value) })} className="w-1/2 bg-white border border-gray-300 rounded-lg px-3 py-2.5 font-mono shadow-sm" placeholder="Max" />
+                      <input type="number" step="0.5" required value={newCargo.targetTempMax} onChange={(e) => setNewCargo({ ...newCargo, targetTempMax: e.target.value === '' ? '' : Number(e.target.value) })} className="w-1/2 bg-white border border-gray-300 rounded-lg px-3 py-2.5 font-mono shadow-sm text-sm" placeholder="Max" />
                     </div>
                   </div>
                 </div>
@@ -885,12 +990,32 @@ const confirmAiPlan = async (planId: string) => {
                 <h4 className="font-bold text-[#163832] mb-4 flex items-center gap-2 border-b border-gray-200 pb-2"><MapPin className="w-4 h-4 text-[#D98E2B]" /> 2. Logistics Details</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Pickup Origin</label>
-                    <input type="text" required value={newCargo.originName} onChange={(e) => setNewCargo({ ...newCargo, originName: e.target.value })} placeholder="Farm or Packhouse Name" className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-[#5C7A50]/20 shadow-sm" />
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center justify-between">
+                      <span>Pickup Origin</span>
+                      <span className="text-[10px] text-[#5C7A50] font-mono font-normal">Verified DB Hub</span>
+                    </label>
+                    <LocationSelect
+                      hubs={availableHubs}
+                      value={newCargo.originName}
+                      onChange={handleOriginSelect}
+                      placeholder="Select verified origin hub..."
+                      type="origin"
+                      required
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Destination Hub</label>
-                    <input type="text" required value={newCargo.destinationName} onChange={(e) => setNewCargo({ ...newCargo, destinationName: e.target.value })} placeholder="Terminal or Market" className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-[#5C7A50]/20 shadow-sm" />
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center justify-between">
+                      <span>Destination Hub</span>
+                      <span className="text-[10px] text-[#D98E2B] font-mono font-normal">Verified DB Hub</span>
+                    </label>
+                    <LocationSelect
+                      hubs={availableHubs}
+                      value={newCargo.destinationName}
+                      onChange={handleDestinationSelect}
+                      placeholder="Select verified destination terminal..."
+                      type="destination"
+                      required
+                    />
                   </div>
                 </div>
               </section>
@@ -1275,8 +1400,13 @@ const confirmAiPlan = async (planId: string) => {
                   <button onClick={closeNewModal} className="px-5 py-3 text-gray-600 hover:bg-gray-100 rounded-xl font-bold transition-colors">
                     Cancel Request
                   </button>
-                  <button onClick={() => confirmAiPlan(aiPlanResults.recommendedPlan?.id)} className="px-6 py-3 bg-[#D98E2B] hover:bg-[#C27E25] text-white rounded-xl font-bold shadow-md flex items-center gap-2 transition-transform hover:-translate-y-0.5">
-                    <CheckCircle2 className="w-5 h-5" /> Confirm AI Plan
+                  <button onClick={() => confirmAiPlan(selectedPlanType)} className="px-6 py-3 bg-[#D98E2B] hover:bg-[#C27E25] text-white rounded-xl font-bold shadow-md flex items-center gap-2 transition-transform hover:-translate-y-0.5">
+                    <CheckCircle2 className="w-5 h-5" /> Confirm AI Plan (₹{Math.round(
+                      (selectedPlanType === 'recommended' || !selectedPlanType 
+                        ? aiPlanResults?.recommendedPlan?.cost 
+                        : (aiPlanResults?.candidatePlans?.find((p: any) => p.type === selectedPlanType)?.cost || aiPlanResults?.recommendedPlan?.cost)
+                      ) || 0
+                    ).toLocaleString()})
                   </button>
                 </div>
               </div>

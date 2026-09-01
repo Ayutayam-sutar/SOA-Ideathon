@@ -58,6 +58,7 @@ export const shipments = pgTable('shipments', {
   origin: text('origin'),
   destination: text('destination'),
   status: varchar('status', { length: 50 }).default('pending').notNull(),
+  agreedCost: integer('agreed_cost'),
   rejectionReason: text('rejection_reason'),
   assignedVehicle: text('assigned_vehicle'),
   pickupStartHour: integer('pickup_start_hour'),
@@ -100,8 +101,15 @@ export const deliveryRoutes = pgTable('delivery_routes', {
   clusterId: varchar('cluster_id', { length: 255 }).references(() => consolidationClusters.id),
   status: varchar('status', { length: 50 }).notNull(),
   totalCost: real('total_cost').notNull(),
+  // Driver & vehicle linkage (Phase 3)
+  driverAgentId: varchar('driver_agent_id', { length: 255 }),
+  driverAgentName: text('driver_agent_name'),
+  driverAgentPhone: text('driver_agent_phone'),
+  vehicleId: varchar('vehicle_id', { length: 255 }),
+  name: text('name'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
 
 export const routeLegs = pgTable('route_legs', {
   id: varchar('id', { length: 255 }).primaryKey(),
@@ -117,8 +125,18 @@ export const routeLegs = pgTable('route_legs', {
 
 export const incidentReports = pgTable('incident_reports', {
   id: varchar('id', { length: 255 }).primaryKey(),
-  shipmentId: varchar('shipment_id', { length: 255 }).references(() => shipments.id), // Can optionally link to shipment or route
+  shipmentId: varchar('shipment_id', { length: 255 }).references(() => shipments.id),
+  // Route & vehicle linkage (filled on driver submission)
+  routeId: varchar('route_id', { length: 255 }),
+  vehicleId: varchar('vehicle_id', { length: 255 }),
+  // Driver context
+  agentId: varchar('agent_id', { length: 255 }),
+  agentName: text('agent_name'),
+  // Incident details
   type: incidentTypeEnum('type').notNull(),
+  severity: varchar('severity', { length: 50 }).default('high'),
+  locationName: text('location_name'),
+  notes: text('notes'),
   spoilageRiskImpactHours: real('spoilage_risk_impact_hours').notNull(),
   status: varchar('status', { length: 50 }).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),

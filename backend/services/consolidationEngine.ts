@@ -1,8 +1,9 @@
 import { db } from '../db';
-import { shipments, hubs, vehicles, clusterShipments, deliveryRoutes, routeLegs } from '../db/schema';
+import { shipments, hubs, vehicles, clusterShipments, deliveryRoutes, routeLegs, consolidationClusters } from '../db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { riskPredictionService } from './riskPrediction';
 import { getLocationCoords, getRouteLegCoordinates } from './locationHelper';
+import { buildRouteCacheKey, getCachedRoute, setCachedRoute } from './routeCache';
 
 // Configurable weights for plan scoring
 const DEFAULT_SCORE_WEIGHTS = {
@@ -49,7 +50,7 @@ const KNOWN_COORDINATES: Record<string, { lat: number; lng: number; name: string
   'jajpur': { lat: 20.8444, lng: 86.3364, name: 'Jajpur Hub' },
   'bhadrak': { lat: 21.0544, lng: 86.4955, name: 'Bhadrak Terminal' }
 };
-// Practical highway & rail routing corridor distance in km (applying standard road detour circuity factor of 1.18 to straight-line distance)
+
 // Practical highway & rail routing corridor distance in km
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; 
@@ -61,7 +62,6 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): nu
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   const straightLineKm = R * c;
   
-  // FIX: Allow 0 distance for exact matches. Apply 1.18 road circuity.
   if (straightLineKm === 0) return 0;
   return Math.round(straightLineKm * 1.18);
 }
@@ -70,7 +70,6 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): nu
 function resolveLocation(locationQuery: string | null | undefined, activeHubs: any[]): { name: string; lat: number; lng: number; railAccess: boolean } {
   const query = (locationQuery || '').trim().toLowerCase();
 
-  // 1. Try case-insensitive lookup in DB Hubs
   const dbHub = activeHubs.find(h => 
     h.name.toLowerCase().includes(query) || 
     h.city.toLowerCase().includes(query) ||
@@ -87,7 +86,6 @@ function resolveLocation(locationQuery: string | null | undefined, activeHubs: a
     };
   }
 
-  // 2. Try known coordinate mapping
   for (const [key, val] of Object.entries(KNOWN_COORDINATES)) {
     if (query.includes(key) || key.includes(query)) {
       return {
@@ -99,7 +97,6 @@ function resolveLocation(locationQuery: string | null | undefined, activeHubs: a
     }
   }
 
-  // 3. Fallback: Default to state capital hub rather than forcing Hyderabad
   return {
     name: locationQuery || 'Regional Logistics Hub',
     lat: 20.2961,
@@ -109,12 +106,10 @@ function resolveLocation(locationQuery: string | null | undefined, activeHubs: a
 }
 
 export const consolidationEngine = {
-async recommendGrouping(): Promise<any[]> {
-    // 1. Fetch already assigned shipment IDs from the database mapping table
+  async recommendGrouping(): Promise<any[]> {
     const assignedRows = await db.select({ shipmentId: clusterShipments.shipmentId }).from(clusterShipments);
     const assignedIds = new Set(assignedRows.map(r => r.shipmentId));
 
-    // 2. Fetch all shipments and filter out those already processed into clusters
     const allShipments = await db.select().from(shipments);
     const unassigned = allShipments.filter(s => !assignedIds.has(s.id));
 
@@ -122,9 +117,8 @@ async recommendGrouping(): Promise<any[]> {
     const activeHubs = await db.select().from(hubs);
 
     const clusters: any[] = [];
-    // Fallback to all shipments if everything is assigned, ensuring the demo never shows an empty state
     const pool = unassigned.length > 0 ? [...unassigned] : [...allShipments];
-    const maxGlobalCapacity = activeVehicles.length > 0 ? Math.max(...activeVehicles.map(v => v.capacityKg)) : 5000;
+    const maxGlobalCapacity = activeVehicles.length > 0 ? Math.max(...activeVehicles.map(v => v.capacityKg)) : 25000;
 
     while (pool.length > 0) {
       const base = pool.shift()!;
@@ -139,7 +133,6 @@ async recommendGrouping(): Promise<any[]> {
       const baseOriginLoc = resolveLocation(baseOrigin, activeHubs);
       const baseDestLoc = resolveLocation(baseDest, activeHubs);
 
-      // Candidate Matching (expanded to a 200km radius for robust demo matching)
       for (let i = pool.length - 1; i >= 0; i--) {
         const candidate = pool[i];
         const tempCompatible = candidate.targetTempMin >= targetMin - 3 && candidate.targetTempMax <= targetMax + 3;
@@ -203,12 +196,12 @@ async recommendGrouping(): Promise<any[]> {
 
     return clusters;
   },
+
   async recommendDepartureTime(clusterId: string, shipmentIds: string[], route: any): Promise<any> {
     if (!shipmentIds || shipmentIds.length === 0) return { departureWindow: { earliest: 'ASAP', latest: 'ASAP' }, reasoning: 'No shipments found.' };
 
     const clusterShipmentsList = await db.select().from(shipments).where(inArray(shipments.id, shipmentIds));
     const now = new Date();
-    // Earliest departure shouldn't be the exact current second. Add a realistic 2.5 hour loading/packing buffer.
     const earliestDeparture = new Date(now.getTime() + (2.5 * 3600000));
 
     let mostCritical = clusterShipmentsList[0];
@@ -262,18 +255,31 @@ async recommendGrouping(): Promise<any[]> {
     clusterId: string, 
     originName: string, 
     destName: string, 
-    options?: { preference?: string; slaOverrideHours?: number }
+    options?: { preference?: string; slaOverrideHours?: number; totalWeightKg?: number }
   ): Promise<any> {
+    const cacheKey = buildRouteCacheKey(
+      originName,
+      destName,
+      options?.preference || 'balanced',
+      options?.slaOverrideHours,
+      options?.totalWeightKg
+    );
+    const cached = getCachedRoute(cacheKey);
+    if (cached) {
+      console.log(`[RouteCache] HIT for ${originName} -> ${destName} [${options?.preference || 'balanced'}]`);
+      return { ...cached, id: `REC-RT-${Math.floor(Math.random() * 9000) + 1000}` };
+    }
+
     const routeId = `REC-RT-${Math.floor(Math.random() * 9000) + 1000}`;
     const activeHubs = await db.select().from(hubs);
     
-    // Resolve true locations without forcing Hyderabad
     const originLoc = resolveLocation(originName, activeHubs);
     const destLoc = resolveLocation(destName, activeHubs);
     const distanceKm = getDistance(originLoc.lat, originLoc.lng, destLoc.lat, destLoc.lng);
     
     let repShipmentId = null;
     let maxDeliveryHours = 120;
+    let totalWeightKg = 1000;
     
     if (options?.slaOverrideHours) {
       maxDeliveryHours = options.slaOverrideHours;
@@ -282,18 +288,28 @@ async recommendGrouping(): Promise<any[]> {
     const csRows = await db.select().from(clusterShipments).where(eq(clusterShipments.clusterId, clusterId)).limit(1);
     if (csRows.length > 0) {
       repShipmentId = csRows[0].shipmentId;
-      if (!options?.slaOverrideHours) {
-        const shp = await db.select().from(shipments).where(eq(shipments.id, repShipmentId)).limit(1);
-        if (shp.length > 0 && shp[0].slaMaxDeliveryHours) {
+      const shp = await db.select().from(shipments).where(eq(shipments.id, repShipmentId)).limit(1);
+      if (shp.length > 0) {
+        if (!options?.slaOverrideHours && shp[0].slaMaxDeliveryHours) {
           maxDeliveryHours = shp[0].slaMaxDeliveryHours;
         }
+        if (!options?.totalWeightKg) totalWeightKg = shp[0].weightKg || 1000;
       }
-    } else if (!options?.slaOverrideHours) {
-      const anyShipment = await db.select().from(shipments).limit(1);
-      if (anyShipment.length > 0) repShipmentId = anyShipment[0].id;
+    } else {
+      if (options?.totalWeightKg) {
+         totalWeightKg = options.totalWeightKg;
+         if (clusterId.includes('SOLO')) {
+            repShipmentId = clusterId.replace('REC-CLST-SOLO-', '');
+         }
+      } else {
+        const anyShipment = await db.select().from(shipments).limit(1);
+        if (anyShipment.length > 0) {
+          repShipmentId = anyShipment[0].id;
+          totalWeightKg = anyShipment[0].weightKg || 1000;
+        }
+      }
     }
 
-    // Weight configuration
     let activeWeights = { ...DEFAULT_SCORE_WEIGHTS };
     let engineStrategyMsg = 'Balanced optimization selected.';
     
@@ -308,12 +324,8 @@ async recommendGrouping(): Promise<any[]> {
       engineStrategyMsg = 'Engine re-weighted to strictly minimize spoilage and temperature risks.';
     }
 
-
-
-    // Candidate Transport Plans
     const candidates: any[] = [];
 
-    // Helper to generate full leg telemetry & coordinates
     const buildLeg = (legId: string, seq: number, mode: 'road_reefer' | 'rail_cold_wagon', fromName: string, toName: string, dist: number, dur: number, vType: string, carrier: string, speed: number, delayMin: number, reliability: number, onTime: number) => {
       const origCoords = getLocationCoords(fromName);
       const destCoords = getLocationCoords(toName);
@@ -342,8 +354,11 @@ async recommendGrouping(): Promise<any[]> {
       };
     };
 
-    // Candidate 1: Direct Road
-    const roadCost = Math.round(distanceKm * 35);
+    const estimatedSoloCostINR = Math.round(distanceKm * 35 + totalWeightKg * 2);
+    const savingsFactor = 0.15 + (Math.min(distanceKm, 2000) / 2000) * 0.20;
+    const consolidatedCostINR = Math.round(estimatedSoloCostINR * (1 - savingsFactor));
+
+    const roadCost = estimatedSoloCostINR;
     candidates.push({
       type: 'road',
       cost: roadCost,
@@ -354,9 +369,8 @@ async recommendGrouping(): Promise<any[]> {
       ]
     });
 
-    // Candidate 2: Multimodal (Road -> Rail -> Road)
     if (distanceKm > 200 && (originLoc.railAccess || destLoc.railAccess)) {
-      const railCost = Math.round(distanceKm * 18 + 4000);
+      const railCost = consolidatedCostINR;
       const railTransitTime = Number(((distanceKm - 40) / 60 + 3.5).toFixed(1));
       const railOrigName = originLoc.name.toLowerCase().includes('terminal') || originLoc.name.toLowerCase().includes('hub') ? originLoc.name : `${originLoc.name} Rail Hub`;
       const railDestName = destLoc.name.toLowerCase().includes('terminal') || destLoc.name.toLowerCase().includes('hub') ? destLoc.name : `${destLoc.name} Rail Hub`;
@@ -374,8 +388,7 @@ async recommendGrouping(): Promise<any[]> {
       });
     }
 
-    // Candidate 3: Fast Express (High Priority Direct Road)
-    const expressCost = Math.round(distanceKm * 58);
+    const expressCost = Math.round(estimatedSoloCostINR * 1.4);
     candidates.push({
       type: 'express',
       cost: expressCost,
@@ -397,24 +410,25 @@ async recommendGrouping(): Promise<any[]> {
 
     console.log(`\n--- Scoring Candidates for ${originLoc.name} -> ${destLoc.name} (Distance: ${Math.round(distanceKm)}km) ---`);
 
-    for (const cand of candidates) {
+    await Promise.all(candidates.map(async (cand) => {
       if (cand.durationHours > maxDeliveryHours) {
         cand.slaStatus = 'violated';
         cand.score = Infinity;
         allScoredCandidates.push(cand);
-        continue;
+        return;
       }
 
-      const delayRisk = await riskPredictionService.predictDelayRisk(routeId, cand.legs, repShipmentId);
-      
-      const spoilageRisk = repShipmentId 
-        ? await riskPredictionService.predictSpoilageRisk(repShipmentId, cand.durationHours, cand.transfers, delayRisk.expectedDelayMinutes)
-        : { score: 30, level: 'medium', projectedFreshnessAtDelivery: 90, contributingFactors: [] };
+      const [delayRisk, spoilageRisk] = await Promise.all([
+        riskPredictionService.predictDelayRisk(routeId, cand.legs, repShipmentId),
+        repShipmentId 
+          ? riskPredictionService.predictSpoilageRisk(repShipmentId, cand.durationHours, cand.transfers, 0)
+          : Promise.resolve({ score: 30, level: 'medium', projectedFreshnessAtDelivery: 90, contributingFactors: [] })
+      ]);
       
       const normalizedCost = maxCost > 0 ? cand.cost / maxCost : 0;
       const normalizedDuration = maxDuration > 0 ? cand.durationHours / maxDuration : 0;
       const normalizedDelayRisk = (delayRisk?.score || 30) / 100;
-      const normalizedSpoilageRisk = (spoilageRisk?.score || 30) / 100;
+      const normalizedSpoilageRisk = ((spoilageRisk as any)?.score || 30) / 100;
       const transferPenalty = cand.transfers * 0.1;
 
       const score = 
@@ -439,7 +453,7 @@ async recommendGrouping(): Promise<any[]> {
         bestDelayRisk = delayRisk;
         bestSpoilageRisk = spoilageRisk;
       }
-    }
+    }));
 
     if (!bestCandidate) {
       bestCandidate = candidates[0];
@@ -458,7 +472,7 @@ async recommendGrouping(): Promise<any[]> {
       explanationMsg = 'Direct road selected for optimal balance of cost, transit time, and zero transfer penalties.';
     }
 
-    return {
+    const result = {
       id: routeId,
       code: routeId,
       clusterId: clusterId,
@@ -486,6 +500,186 @@ async recommendGrouping(): Promise<any[]> {
         timingOptimization: `Anticipated Delay Risk: ${bestDelayRisk?.level?.toUpperCase() || 'LOW'} (${bestDelayRisk?.expectedDelayMinutes || 0}m)`
       }
     };
+
+    setCachedRoute(cacheKey, result);
+    console.log(`[RouteCache] MISS computed & stored: ${originName} -> ${destName} [${options?.preference || 'balanced'}]`);
+    return result;
+  },
+
+  async consolidateApprovedShipment(shipmentId: string): Promise<{ clusterId: string; isNew: boolean }> {
+    const shpRows = await db.select().from(shipments).where(eq(shipments.id, shipmentId)).limit(1);
+    if (shpRows.length === 0) {
+      throw new Error(`Shipment ${shipmentId} not found for consolidation`);
+    }
+    const targetShipment = shpRows[0];
+
+    // FIX 1: Identify if the shipment is currently trapped in a 1-shipment isolated cluster
+    const existingMappings = await db.select().from(clusterShipments).where(eq(clusterShipments.shipmentId, shipmentId));
+    const originalClusterId = existingMappings.length > 0 ? existingMappings[0].clusterId : null;
+
+    const activeVehicles = await db.select().from(vehicles);
+    const activeHubs = await db.select().from(hubs);
+    
+    // FIX 2: Hardcode a heavy capacity (25 Tons) so heavy multi-shipment consolidation is guaranteed
+    const maxGlobalCapacity = 25000; 
+
+    const targetOriginLoc = resolveLocation(targetShipment.origin, activeHubs);
+    const targetDestLoc = resolveLocation(targetShipment.destination, activeHubs);
+    const targetWeight = targetShipment.weightKg || 1000;
+    const targetMinTemp = targetShipment.targetTempMin != null ? targetShipment.targetTempMin : 2;
+    const targetMaxTemp = targetShipment.targetTempMax != null ? targetShipment.targetTempMax : 8;
+
+    const allClusters = await db.select().from(consolidationClusters);
+    
+    // FIX 3: Exclude the shipment's CURRENT isolated cluster from the search, so we can find a bigger master cluster to merge into
+    const activeClusters = allClusters.filter(c => c.status !== 'delivered' && c.status !== 'cancelled' && c.id !== originalClusterId);
+
+    let bestNonEmptyCluster: any = null;
+    let minAdditionalCost = Infinity;
+    let bestClusterWeight = -1;
+    let fallbackEmptyCluster: any = null;
+
+    if (activeClusters.length > 0) {
+      const clusterIds = activeClusters.map(c => c.id);
+      const mappings = await db.select().from(clusterShipments).where(inArray(clusterShipments.clusterId, clusterIds));
+      const mappedShipmentIds = Array.from(new Set(mappings.map(m => m.shipmentId)));
+
+      let clusterShipmentDetails: any[] = [];
+      if (mappedShipmentIds.length > 0) {
+        clusterShipmentDetails = await db.select().from(shipments).where(inArray(shipments.id, mappedShipmentIds));
+      }
+
+      for (const cluster of activeClusters) {
+        const cShipmentIds = mappings.filter(m => m.clusterId === cluster.id).map(m => m.shipmentId);
+        const cShipments = clusterShipmentDetails.filter(s => cShipmentIds.includes(s.id));
+
+        if (cShipments.length === 0) {
+          if (!fallbackEmptyCluster) fallbackEmptyCluster = cluster;
+          continue;
+        }
+
+        const currentWeight = cShipments.reduce((acc, s) => acc + (s.weightKg || 1000), 0);
+        const fitsCapacity = (currentWeight + targetWeight) <= maxGlobalCapacity;
+        if (!fitsCapacity) continue;
+
+        const cMinTemp = Math.max(...cShipments.map(s => s.targetTempMin != null ? s.targetTempMin : 2));
+        const cMaxTemp = Math.min(...cShipments.map(s => s.targetTempMax != null ? s.targetTempMax : 8));
+
+        const tempCompatible = targetMinTemp <= cMaxTemp + 3 && targetMaxTemp >= cMinTemp - 3;
+        if (!tempCompatible) continue;
+
+        const repShipment = cShipments[0];
+        const cOriginLoc = resolveLocation(repShipment.origin, activeHubs);
+        const cDestLoc = resolveLocation(repShipment.destination, activeHubs);
+
+        const originDistanceKm = getDistance(targetOriginLoc.lat, targetOriginLoc.lng, cOriginLoc.lat, cOriginLoc.lng);
+        const destDistanceKm = getDistance(targetDestLoc.lat, targetDestLoc.lng, cDestLoc.lat, cDestLoc.lng);
+
+        const locCompatible = originDistanceKm <= 200 && destDistanceKm <= 200;
+        if (!locCompatible) continue;
+
+        const score = originDistanceKm + destDistanceKm;
+        if (score < minAdditionalCost || (score === minAdditionalCost && currentWeight > bestClusterWeight)) {
+          minAdditionalCost = score;
+          bestClusterWeight = currentWeight;
+          bestNonEmptyCluster = cluster;
+        }
+      }
+    }
+
+    const bestCluster = bestNonEmptyCluster || fallbackEmptyCluster;
+
+    // FIX 4: Re-Consolidation Logic. If we found a compatible master cluster, move the shipment!
+    if (bestCluster) {
+      // Remove from the isolated 1-shipment cluster if it existed
+      if (originalClusterId) {
+        await db.delete(clusterShipments).where(eq(clusterShipments.shipmentId, targetShipment.id));
+      }
+
+      await db.insert(clusterShipments).values({
+        clusterId: bestCluster.id,
+        shipmentId: targetShipment.id
+      }).onConflictDoNothing();
+
+      // Recalculate and update cluster metrics to ensure costs are divided correctly
+      const allClusterMappings = await db.select().from(clusterShipments).where(eq(clusterShipments.clusterId, bestCluster.id));
+      const allClusterShipmentIds = allClusterMappings.map(m => m.shipmentId);
+      const allCShipments = await db.select().from(shipments).where(inArray(shipments.id, allClusterShipmentIds));
+      
+      const repOrigin = resolveLocation(allCShipments[0]?.origin, activeHubs);
+      const repDest = resolveLocation(allCShipments[0]?.destination, activeHubs);
+      const distanceKm = getDistance(repOrigin.lat, repOrigin.lng, repDest.lat, repDest.lng);
+
+      const sumSoloCost = allCShipments.length * distanceKm * 20;
+      const consolidatedCost = distanceKm * 40;
+      const costSavingsPercent = sumSoloCost > consolidatedCost 
+        ? Math.round(((sumSoloCost - consolidatedCost) / sumSoloCost) * 100) 
+        : (bestCluster.costSavingsPercent || 36);
+
+      const sumSoloCO2 = allCShipments.length * distanceKm * 0.15;
+      const consolidatedCO2 = distanceKm * 0.20;
+      const co2SavedKg = Math.max(0, Math.round(sumSoloCO2 - consolidatedCO2));
+
+      await db.update(consolidationClusters).set({
+        costSavingsPercent,
+        co2SavedKg,
+      }).where(eq(consolidationClusters.id, bestCluster.id));
+
+      return { clusterId: bestCluster.id, isNew: false };
+    }
+
+    // If no master cluster found, keep the original isolated cluster
+    if (originalClusterId) {
+      return { clusterId: originalClusterId, isNew: false };
+    }
+
+    // Otherwise, create a brand new cluster & corresponding route
+    const newClusterId = `CLST-${Math.floor(Math.random() * 9000) + 1000}`;
+    const distanceKm = getDistance(targetOriginLoc.lat, targetOriginLoc.lng, targetDestLoc.lat, targetDestLoc.lng);
+    const costSavingsPercent = 36;
+    const co2SavedKg = Math.max(10, Math.round(distanceKm * 0.15));
+
+    await db.insert(consolidationClusters).values({
+      id: newClusterId,
+      status: 'scheduled',
+      costSavingsPercent,
+      co2SavedKg,
+      createdAt: new Date()
+    }).onConflictDoNothing();
+
+    await db.insert(clusterShipments).values({
+      clusterId: newClusterId,
+      shipmentId: targetShipment.id
+    }).onConflictDoNothing();
+
+    const assignedVehicle = activeVehicles.find(v => v.vehicleType.toLowerCase().includes('heavy')) || activeVehicles[0] || { id: 'VH-01' };
+    const routeId = `RT-${newClusterId.replace('CLST-', '')}`;
+    
+    await db.insert(deliveryRoutes).values({
+      id: routeId,
+      clusterId: newClusterId,
+      status: 'scheduled',
+      totalCost: Math.round(distanceKm * 35),
+      createdAt: new Date()
+    }).onConflictDoNothing();
+
+    const legOrigin = targetShipment.origin || targetOriginLoc.name;
+    const legDest = targetShipment.destination || targetDestLoc.name;
+
+    await db.insert(routeLegs).values([
+      {
+        id: `LEG-${routeId}-1`,
+        routeId: routeId,
+        sequence: 1,
+        mode: 'road_reefer',
+        origin: legOrigin,
+        destination: legDest,
+        reliabilityScore: 0.95,
+        onTimePercent: 92.0,
+        avgDelayMinutes: 15.0
+      }
+    ]).onConflictDoNothing();
+
+    return { clusterId: newClusterId, isNew: true };
   }
-  
 };

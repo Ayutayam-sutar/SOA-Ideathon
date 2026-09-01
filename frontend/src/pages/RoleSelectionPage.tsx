@@ -45,11 +45,10 @@ export const RoleSelectionPage: React.FC = () => {
       icon: Navigation,
       buttonBg: 'bg-[#D98E2B] hover:bg-[#B5721C] text-[#FFFFFF]',
       demoAccount: 'agent1@karwaan.in (Reefer Captain)',
-      hidden: true,
     },
   ];
 
-  const visibleRoles = roles.filter((r) => !r.hidden);
+  const visibleRoles = roles; // All three roles are now active
 
   return (
     <div className="min-h-screen bg-[#F3F5F2] text-[#1A211E] flex flex-col">
@@ -83,13 +82,13 @@ export const RoleSelectionPage: React.FC = () => {
             Select your operational role
           </h1>
           <p className="text-sm text-[#596560] leading-relaxed">
-            Karwaan provides purpose-built interfaces tailored to platform administrators
-            and agricultural shippers.
+            Karwaan provides purpose-built interfaces for platform administrators,
+            agricultural shippers, and reefer fleet drivers.
           </p>
         </div>
 
-        {/* 2 Role Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto w-full">
+        {/* 3 Role Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto w-full">
           {visibleRoles.map((role) => {
             const Icon = role.icon;
             return (

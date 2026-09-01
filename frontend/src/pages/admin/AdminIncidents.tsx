@@ -9,6 +9,7 @@ import {
   IncidentReport,
   DeliveryRoute,
   Shipment,
+  INCIDENT_TYPE_LABELS,
 } from "../../types";
 
 export const AdminIncidents: React.FC = () => {
@@ -22,13 +23,16 @@ export const AdminIncidents: React.FC = () => {
   const [successMessage, setSuccessMessage] =
     useState<string | null>(null);
 
+  const loadData = async () => {
+    setIncidents(await dataService.getIncidents());
+    setRoutes(await dataService.getRoutes());
+    setShipments(await dataService.getShipments());
+  };
+
   useEffect(() => {
-    const loadData = async () => {
-      setIncidents(await dataService.getIncidents());
-      setRoutes(await dataService.getRoutes());
-      setShipments(await dataService.getShipments());
-    };
     loadData();
+    const poll = setInterval(loadData, 8000);
+    return () => clearInterval(poll);
   }, []);
 
   const handleReoptimizeRoute = async (
@@ -111,10 +115,9 @@ export const AdminIncidents: React.FC = () => {
                     </span>
 
                     <span className="font-display font-bold text-sm text-[#1A211E]">
-                      {incident.type
-                        .replace("_", " ")
-                        .toUpperCase()}{" "}
-                      • {incident.cargoType}
+                      {INCIDENT_TYPE_LABELS[incident.type] ||
+                        incident.type?.replace(/_/g, " ").toUpperCase()}{" "}
+                      • {incident.cargoType || "Cargo"}
                     </span>
                   </div>
 
@@ -138,26 +141,31 @@ export const AdminIncidents: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 bg-white/70 p-3 rounded text-xs font-mono">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-2 bg-white/70 p-3 rounded text-xs font-mono">
                   <div>
-                    <strong>Location:</strong>{" "}
-                    {incident.locationName}
+                    <strong>Route:</strong>{" "}
+                    {incident.routeCode || incident.routeId || "—"}
+                  </div>
+
+                  <div>
+                    <strong>Vehicle:</strong>{" "}
+                    {incident.vehicleId || "—"}
                   </div>
 
                   <div>
                     <strong>Agent:</strong>{" "}
-                    {incident.agentName}
+                    {incident.agentName || "Fleet driver"}
                   </div>
 
                   <div>
                     <strong>Shelf-Life Impact:</strong>{" "}
-                    -{incident.spoilageRiskImpactHours}h
+                    -{incident.spoilageRiskImpactHours ?? 0}h
                   </div>
                 </div>
 
                 <p className="text-xs text-[#1A211E] leading-relaxed">
-                  <strong>Observation Notes:</strong>{" "}
-                  {incident.notes}
+                  <strong>Description:</strong>{" "}
+                  {incident.notes || "No description provided."}
                 </p>
 
                 <div className="bg-[#FFFFFF] border border-[#D6DCD4] p-2.5 rounded text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -193,7 +201,7 @@ export const AdminIncidents: React.FC = () => {
 
             {incidents.length === 0 && (
               <div className="py-10 text-center text-xs text-[#596560]">
-                No incidents reported.
+                No incidents reported yet. Driver telemetry from the Delivery Agent dashboard will appear here.
               </div>
             )}
           </div>
@@ -207,6 +215,8 @@ export const AdminIncidents: React.FC = () => {
         }
         routes={routes}
         shipments={shipments}
+        variant="admin"
+        onIncidentSubmitted={loadData}
       />
     </>
   );

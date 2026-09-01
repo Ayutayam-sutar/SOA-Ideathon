@@ -18,6 +18,8 @@ export const AdminLayout: React.FC = () => {
       setIncidents(await dataService.getIncidents());
     };
     loadData();
+    const poll = setInterval(loadData, 8000);
+    return () => clearInterval(poll);
   }, []);
 
   const openIncidentsCount = incidents.filter(

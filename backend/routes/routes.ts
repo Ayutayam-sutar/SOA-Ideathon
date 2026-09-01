@@ -7,7 +7,8 @@ import {
   updateRoute,
   getRouteRisk,
   explainRoute,
-  reoptimizeRoute
+  reoptimizeRoute,
+  completeRoute
 } from '../controllers/routesController';
 
 const router = Router();
@@ -21,9 +22,10 @@ router.use(requireAuth);
 router.get('/', getRoutes);
 router.get('/:id', getRouteById);
 router.patch('/:id', updateRoute);
+router.put('/:id/complete', completeRoute); // Phase 4: GPS-ready delivery completion
 router.get('/:id/risk', getRouteRisk);
 router.post('/:id/explain', explainRoute);
 router.post('/:id/reoptimize', reoptimizeRoute);
 
 
-export default router;
+export default router;

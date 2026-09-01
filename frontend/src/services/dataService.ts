@@ -115,9 +115,13 @@ class DataService {
     slaPriority?: string;
     deliveryDeadline: string;
     notes?: string;
+    status?: string;
   }): Promise<Shipment> {
     const res = await apiClient.post('/shipments', data);
     return res.shipment;
+  }
+  public async confirmShipment(shipmentId: string, agreedCost?: number): Promise<void> {
+    return apiClient.patch(`/shipments/${shipmentId}`, { status: 'pending', agreedCost });
   }
 
   public async approveShipment(shipmentId: string): Promise<void> {
@@ -165,6 +169,15 @@ class DataService {
     await apiClient.patch(`/routes/${routeId}`, { action: 'complete_stop', stopId });
   }
 
+  public async completeRoute(routeId: string, lat?: number, lng?: number): Promise<{
+    success: boolean;
+    routeId: string;
+    deliveredShipmentIds: string[];
+    completedAt: string;
+  }> {
+    return apiClient.put(`/routes/${routeId}/complete`, { lat, lng });
+  }
+
   // Incidents
   public async getIncidents(): Promise<IncidentReport[]> {
     const res = await apiClient.get('/incidents');
@@ -181,14 +194,16 @@ class DataService {
   }
 
   public async createIncident(data: {
-    routeId: string;
-    shipmentId: string;
+    routeId?: string;
+    vehicleId?: string;
+    shipmentId?: string;
     type: IncidentType;
-    severity: IncidentReport['severity'];
-    locationName: string;
+    severity?: IncidentReport['severity'];
+    locationName?: string;
     locationCoords?: [number, number];
     notes: string;
-    agentId: string;
+    agentId?: string;
+    agentName?: string;
   }): Promise<IncidentReport> {
     const res = await apiClient.post('/incidents', data);
     return res.incident;

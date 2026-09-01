@@ -3,6 +3,7 @@ import { db } from '../db';
 import { shipments, businesses, temperatureLogEntries } from '../db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { riskPredictionService } from '../services/riskPrediction';
+import { consolidationEngine } from '../services/consolidationEngine';
 import { maskCommercialData } from '../middleware/fieldMasking';
 import { getShipmentRouteInfo, dynamicLocationsCache, getLocationCoords, calculateShipmentEconomics } from '../services/locationHelper';
 
@@ -18,14 +19,14 @@ const SEED_DEFAULT_CO2_SAVED_KG = 50;
 
 export const getShipments = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userRole = (req as any).user.role;
-    const businessId = (req as any).user.businessId;
+    const userRole = (req as any).user?.role;
+    const businessId = (req as any).user?.businessId;
 
     let query = db.select({
       shipment: shipments,
       business: businesses,
     }).from(shipments)
-      .innerJoin(businesses, eq(shipments.businessId, businesses.id));
+      .leftJoin(businesses, eq(shipments.businessId, businesses.id));
 
     if (userRole === 'business') {
       if (!businessId) {
@@ -45,24 +46,27 @@ export const getShipments = async (req: Request, res: Response, next: NextFuncti
       const weight = shipment.weightKg != null ? shipment.weightKg : SEED_DEFAULT_WEIGHT_KG;
       const economics = calculateShipmentEconomics(weight, [routeInfo.origin.lat, routeInfo.origin.lng], [routeInfo.destination.lat, routeInfo.destination.lng]);
 
+      const agreedCost = shipment.agreedCost != null ? shipment.agreedCost : economics.consolidatedCostINR;
+      const estimatedSoloCostINR = Math.max(economics.estimatedSoloCostINR, Math.round(agreedCost * 1.35));
+      const costSavingsPercent = Math.max(10, Math.round(((estimatedSoloCostINR - agreedCost) / estimatedSoloCostINR) * 100));
+
       // Pad to perfectly match the frontend 'Shipment' type
       return {
         ...shipment,
         code: shipment.id,
-        businessName: business.name,
+        businessName: business?.name || 'Unknown',
         category: SEED_DEFAULT_CATEGORY,
         weightKg: weight,
         volumeCbm: SEED_DEFAULT_VOLUME_CBM,
         origin: routeInfo.origin,
         destination: routeInfo.destination,
         targetTempRange: { min: shipment.targetTempMin, max: shipment.targetTempMax },
-        humidityPercent: SEED_DEFAULT_HUMIDITY_PERCENT,
         dispatchTime: shipment.createdAt,
         deliveryDeadline: new Date(new Date(shipment.createdAt).getTime() + (shipment.slaMaxDeliveryHours || 48) * 3600000).toISOString(),
         status: shipment.status || 'pending',
-        estimatedSoloCostINR: economics.estimatedSoloCostINR,
-        consolidatedCostINR: economics.consolidatedCostINR,
-        costSavingsPercent: economics.costSavingsPercent,
+        estimatedSoloCostINR,
+        consolidatedCostINR: agreedCost,
+        costSavingsPercent,
         co2SavedKg: economics.co2SavedKg,
         consolidationReason: economics.consolidationReason,
         temperatureHistory: logs.map(l => ({
@@ -87,14 +91,14 @@ export const getShipments = async (req: Request, res: Response, next: NextFuncti
 export const getShipmentById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
-    const userRole = (req as any).user.role;
-    const businessId = (req as any).user.businessId;
+    const userRole = (req as any).user?.role;
+    const businessId = (req as any).user?.businessId;
 
     const result = await db.select({
       shipment: shipments,
       business: businesses,
     }).from(shipments)
-      .innerJoin(businesses, eq(shipments.businessId, businesses.id))
+      .leftJoin(businesses, eq(shipments.businessId, businesses.id))
       .where(eq(shipments.id, id))
       .limit(1);
 
@@ -102,7 +106,7 @@ export const getShipmentById = async (req: Request, res: Response, next: NextFun
 
     const { shipment, business } = result[0];
 
-    if (userRole === 'business' && shipment.businessId !== businessId) {
+    if (userRole === 'business' && businessId && shipment.businessId !== businessId) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -113,10 +117,14 @@ export const getShipmentById = async (req: Request, res: Response, next: NextFun
     const weight = shipment.weightKg != null ? shipment.weightKg : SEED_DEFAULT_WEIGHT_KG;
     const economics = calculateShipmentEconomics(weight, [routeInfo.origin.lat, routeInfo.origin.lng], [routeInfo.destination.lat, routeInfo.destination.lng]);
 
+    const agreedCost = shipment.agreedCost != null ? shipment.agreedCost : economics.consolidatedCostINR;
+    const estimatedSoloCostINR = Math.max(economics.estimatedSoloCostINR, Math.round(agreedCost * 1.35));
+    const costSavingsPercent = Math.max(10, Math.round(((estimatedSoloCostINR - agreedCost) / estimatedSoloCostINR) * 100));
+
     const formatted = {
       ...shipment,
       code: shipment.id,
-      businessName: business.name,
+      businessName: business?.name || 'Unknown',
       category: SEED_DEFAULT_CATEGORY,
       weightKg: weight,
       volumeCbm: SEED_DEFAULT_VOLUME_CBM,
@@ -127,9 +135,9 @@ export const getShipmentById = async (req: Request, res: Response, next: NextFun
       dispatchTime: shipment.createdAt,
       deliveryDeadline: new Date(new Date(shipment.createdAt).getTime() + (shipment.slaMaxDeliveryHours || 48) * 3600000).toISOString(),
       status: shipment.status || 'pending',
-      estimatedSoloCostINR: economics.estimatedSoloCostINR,
-      consolidatedCostINR: economics.consolidatedCostINR,
-      costSavingsPercent: economics.costSavingsPercent,
+      estimatedSoloCostINR,
+      consolidatedCostINR: agreedCost,
+      costSavingsPercent,
       co2SavedKg: economics.co2SavedKg,
       consolidationReason: economics.consolidationReason,
       temperatureHistory: logs.map(l => ({
@@ -152,7 +160,8 @@ export const getShipmentById = async (req: Request, res: Response, next: NextFun
 
 export const createShipment = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const businessId = (req as any).user.businessId;
+    const userRole = (req as any).user?.role;
+    const businessId = (req as any).user?.businessId || req.body.businessId;
     if (!businessId) {
       return res.status(403).json({ error: 'Business ID not linked to this account.' });
     }
@@ -161,7 +170,8 @@ export const createShipment = async (req: Request, res: Response, next: NextFunc
       cargoType, targetTempMin, targetTempMax, totalShelfLifeHours,
       weightKg, volumeCbm, slaMaxDeliveryHours, slaMaxSpoilagePercent, slaPriority,
       category, originName, originLat, originLng, originAddress,
-      destinationName, destinationLat, destinationLng, destinationAddress, deliveryDeadline
+      destinationName, destinationLat, destinationLng, destinationAddress, deliveryDeadline,
+      status
     } = req.body;
 
     // Basic Validation
@@ -203,6 +213,7 @@ export const createShipment = async (req: Request, res: Response, next: NextFunc
       weightKg: weightKg ? Number(weightKg) : null,
       origin: originName || null,
       destination: destinationName || null,
+      status: status || 'pending',
     }).returning();
 
     const shipment = newShipment[0];
@@ -229,7 +240,7 @@ export const createShipment = async (req: Request, res: Response, next: NextFunc
       humidityPercent: SEED_DEFAULT_HUMIDITY_PERCENT,
       dispatchTime: shipment.createdAt,
       deliveryDeadline: deliveryDeadline || new Date(new Date(shipment.createdAt).getTime() + (shipment.slaMaxDeliveryHours || 48) * 3600000).toISOString(),
-      status: 'in_transit',
+      status: shipment.status || 'pending',
       estimatedSoloCostINR: SEED_DEFAULT_ESTIMATED_SOLO_COST_INR,
       consolidatedCostINR: SEED_DEFAULT_CONSOLIDATED_COST_INR,
       costSavingsPercent: SEED_DEFAULT_COST_SAVINGS_PERCENT,
@@ -251,20 +262,20 @@ export const createShipment = async (req: Request, res: Response, next: NextFunc
 export const updateShipment = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
-    const userRole = (req as any).user.role;
-    const businessId = (req as any).user.businessId;
+    const userRole = (req as any).user?.role;
+    const businessId = (req as any).user?.businessId;
 
     const existing = await db.select().from(shipments).where(eq(shipments.id, id)).limit(1);
     if (existing.length === 0) return res.status(404).json({ error: 'Shipment not found' });
 
-    if (userRole === 'business' && existing[0].businessId !== businessId) {
+    if (userRole === 'business' && businessId && existing[0].businessId !== businessId) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
     const {
       cargoType, targetTempMin, targetTempMax, totalShelfLifeHours,
-      weightKg, volumeCbm, slaMaxDeliveryHours, slaMaxSpoilagePercent, slaPriority,
-      origin, destination, status, rejectionReason, assignedVehicle
+      weightKg, slaMaxDeliveryHours, slaMaxSpoilagePercent, slaPriority,
+      origin, destination, status, rejectionReason, assignedVehicle, agreedCost
     } = req.body;
 
     const updates: any = {};
@@ -293,6 +304,7 @@ export const updateShipment = async (req: Request, res: Response, next: NextFunc
     if (status !== undefined) updates.status = status;
     if (rejectionReason !== undefined) updates.rejectionReason = rejectionReason;
     if (assignedVehicle !== undefined) updates.assignedVehicle = assignedVehicle;
+    if (agreedCost !== undefined) updates.agreedCost = agreedCost;
 
     // Reject empty updates map
     if (Object.keys(updates).length === 0) {
@@ -300,6 +312,15 @@ export const updateShipment = async (req: Request, res: Response, next: NextFunc
     }
 
     const updatedShipment = await db.update(shipments).set(updates).where(eq(shipments.id, id)).returning();
+
+    // If shipment was approved, intelligently consolidate into matching cluster
+    if (status === 'approved') {
+      try {
+        await consolidationEngine.consolidateApprovedShipment(id);
+      } catch (clusterErr) {
+        console.error("Clustering on approval error:", clusterErr);
+      }
+    }
 
     res.status(200).json({ shipment: updatedShipment[0] });
   } catch (error) {
