@@ -57,6 +57,7 @@ export const shipments = pgTable('shipments', {
   weightKg: integer('weight_kg'),
   origin: text('origin'),
   destination: text('destination'),
+  status: varchar('status', { length: 50 }).default('pending').notNull(),
   pickupStartHour: integer('pickup_start_hour'),
   pickupEndHour: integer('pickup_end_hour'),
   deliveryDeadlineHr: integer('delivery_deadline_hr'),

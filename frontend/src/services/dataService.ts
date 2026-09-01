@@ -120,6 +120,10 @@ class DataService {
     return res.shipment;
   }
 
+  public async approveShipment(shipmentId: string): Promise<void> {
+    return apiClient.patch(`/shipments/${shipmentId}`, { status: 'in_transit' });
+  }
+
   // Clusters & Routes
   public async getClusters(): Promise<ConsolidationCluster[]> {
     const res = await apiClient.get('/clusters');

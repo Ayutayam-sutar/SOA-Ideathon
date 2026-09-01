@@ -137,7 +137,7 @@ export const KarwaanMap: React.FC<KarwaanMapProps> = ({
         polyline.bindTooltip(
           `<div class="font-mono text-xs p-1 font-semibold">
             ${isRail ? '🚂 Rail Cold Rake' : '🚛 Road Reefer'}: ${leg.distanceKm ? leg.distanceKm + ' km' : ''}<br/>
-            <span class="text-[#596560] font-normal">${leg.originName || leg.origin} → ${leg.destinationName || leg.destination}</span>
+            <span class="text-[#596560] font-normal">${leg.originName} → ${leg.destinationName}</span>
            </div>`,
           { sticky: true }
         );
@@ -227,6 +227,21 @@ export const KarwaanMap: React.FC<KarwaanMapProps> = ({
           m2.bindTooltip(`<div class="font-mono text-xs font-semibold">Destination: ${s.destination.name}</div>`);
           m2.addTo(layerGroup);
           bounds.extend([s.destination.lat, s.destination.lng]);
+        }
+
+        // Draw connecting line between origin and destination
+        if (s.origin && s.origin.lat && s.origin.lng && s.destination && s.destination.lat && s.destination.lng) {
+          const polyline = L.polyline([
+            [s.origin.lat, s.origin.lng],
+            [s.destination.lat, s.destination.lng]
+          ], {
+            color: '#5C7A50',
+            weight: 3,
+            opacity: 0.6,
+            dashArray: '8, 8',
+            lineJoin: 'round',
+          });
+          polyline.addTo(layerGroup);
         }
       });
     }
