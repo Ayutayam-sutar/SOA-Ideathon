@@ -3,13 +3,16 @@ const API_BASE_URL = 'http://localhost:3001/api';
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem('karwaan_token');
   
-  const headers = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    ...(options.headers as Record<string, string> || {}),
   };
 
-  const config = {
+  if (token) {
+    headers['Authorization'] = `Bearer ${token.trim()}`;
+  }
+
+  const config: RequestInit = {
     ...options,
     headers
   };
@@ -39,5 +42,6 @@ export const apiClient = {
   get: (endpoint: string) => fetchWithAuth(endpoint, { method: 'GET' }),
   post: (endpoint: string, body?: any) => fetchWithAuth(endpoint, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
   patch: (endpoint: string, body?: any) => fetchWithAuth(endpoint, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
+  put: (endpoint: string, body?: any) => fetchWithAuth(endpoint, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   delete: (endpoint: string) => fetchWithAuth(endpoint, { method: 'DELETE' }),
 };

@@ -5,6 +5,8 @@ import { shipments, businesses } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { maskCommercialData } from '../middleware/fieldMasking';
 import { getShipmentRouteInfo } from '../services/locationHelper';
+import { buildRouteCacheKey, getCachedRoute, setCachedRoute, getCacheStats } from '../services/routeCache';
+
 export const recommendGrouping = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const clusters = await consolidationEngine.recommendGrouping();
@@ -74,6 +76,20 @@ export const recommendPlan = async (req: Request, res: Response, next: NextFunct
     const originName = typeof shipment.origin === 'string' && shipment.origin ? shipment.origin : (routeInfo.origin?.name || routeInfo.origin);
     const destName = typeof shipment.destination === 'string' && shipment.destination ? shipment.destination : (routeInfo.destination?.name || routeInfo.destination);
 
+    const preference = req.body.optimizationPreference || req.body.preference || 'balanced';
+    const slaOverrideHours = req.body.slaOverrideHours ? Number(req.body.slaOverrideHours) : undefined;
+
+    // ── Plan-level cache check ───────────────────────────────────────
+    // Keyed by: shipmentId + preference + slaOverride
+    // This short-circuits recommendGrouping + recommendRoute + recommendDepartureTime
+    const planCacheKey = `plan::${shipmentId}::${preference}::${slaOverrideHours ?? 'def'}`;
+    const cachedPlan = getCachedRoute(planCacheKey);
+    if (cachedPlan) {
+      console.log(`[PlanCache] HIT for shipment=${shipmentId} pref=${preference}`);
+      return res.status(200).json(maskCommercialData(userRole, cachedPlan));
+    }
+    // ────────────────────────────────────────────────────────────────────
+
     const shipmentSummary = {
       id: shipment.id,
       businessName: business.name,
@@ -109,20 +125,24 @@ export const recommendPlan = async (req: Request, res: Response, next: NextFunct
       };
     }
 
-    const candidateGroups = [targetCluster]; // In a real app we might return multiple grouping strategies
+    const candidateGroups = [targetCluster];
 
     // 3. Recommended Plan and Alternatives
     const recommendedRoute = await consolidationEngine.recommendRoute(
       targetCluster.id, 
       targetCluster.originHub.name, 
       targetCluster.destinationHub.name,
-      { preference: req.body.optimizationPreference, slaOverrideHours: req.body.slaOverrideHours ? Number(req.body.slaOverrideHours) : undefined }
+      { 
+        preference,
+        slaOverrideHours,
+        totalWeightKg: targetCluster.totalWeightKg
+      }
     );
     
     // 4. Departure Time
     const departure = await consolidationEngine.recommendDepartureTime(targetCluster.id, targetCluster.shipmentIds, recommendedRoute);
 
-    // 5. Build massive JSON
+    // 5. Build master JSON
     const masterJson = {
       shipmentSummary,
       candidateGroups,
@@ -157,10 +177,18 @@ export const recommendPlan = async (req: Request, res: Response, next: NextFunct
       candidatePlans: recommendedRoute.alternativePlans || []
     };
 
-    // 6. Role-based Masking
+    // 6. Store in plan cache
+    setCachedRoute(planCacheKey, masterJson);
+    console.log(`[PlanCache] MISS computed & stored for shipment=${shipmentId} pref=${preference}`);
+
+    // 7. Role-based Masking
     res.status(200).json(maskCommercialData(userRole, masterJson));
   } catch (error) {
     next(error);
   }
+};
+
+export const getCacheStatsHandler = (_req: Request, res: Response) => {
+  res.status(200).json({ cache: getCacheStats(), timestamp: new Date().toISOString() });
 };
 

@@ -4,6 +4,7 @@ import { eq, desc } from 'drizzle-orm';
 import { exec } from 'child_process';
 import * as path from 'path';
 import { promisify } from 'util';
+import { buildRiskCacheKey, getCachedRisk, setCachedRisk } from './routeCache';
 
 const execAsync = promisify(exec);
 
@@ -93,13 +94,21 @@ export const riskPredictionService = {
       kinetic_lost_hours: kineticShelfLifeLostHours
     };
 
+    // Cache check: avoid spawning a new Python process for the same shipment/route combination
+    const spoilageCacheKey = buildRiskCacheKey(shipmentId, routeDurationHours, transferCount, 'spoilage');
+    const cachedSpoilage = getCachedRisk(spoilageCacheKey);
+    if (cachedSpoilage) {
+      console.log(`[RiskCache] Spoilage cache HIT for ${shipmentId}`);
+      return cachedSpoilage;
+    }
+
     try {
       const scriptPath = path.join(__dirname, '../models/predict_spoilage.py');
       
       const jsonString = JSON.stringify(mlFeatures);
       const b64Payload = Buffer.from(jsonString).toString('base64');
       
-      const { stdout, stderr } = await execAsync(`python "${scriptPath}" "${b64Payload}"`);
+      const { stdout } = await execAsync(`python "${scriptPath}" "${b64Payload}"`);
       
       const result = JSON.parse(stdout.trim());
       if (result.error) throw new Error(result.error);
@@ -108,7 +117,7 @@ export const riskPredictionService = {
       const freshnessPercent = shipment.freshnessPercent ?? 100;
       const projectedFreshnessAtDelivery = Math.max(0, freshnessPercent - (kineticShelfLifeLostHours / (shipment.totalShelfLifeHours || 120) * 100));
 
-      return {
+      const spoilageResult = {
         score: mlRiskScore,
         level: result.risk_category as 'low' | 'medium' | 'high' | 'critical',
         projectedFreshnessAtDelivery: Math.round(projectedFreshnessAtDelivery),
@@ -117,14 +126,19 @@ export const riskPredictionService = {
           `AI Risk Multiplier: ${mlRiskScore}% probability of external factor spoilage.`
         ],
       };
+      setCachedRisk(spoilageCacheKey, spoilageResult);
+      return spoilageResult;
     } catch (error) {
       console.error("[RiskPrediction] Spoilage ML inference failed, falling back.", error);
-      return {
+      const fallback = {
         score: 25,
-        level: 'medium',
+        level: 'medium' as const,
         projectedFreshnessAtDelivery: 90,
         contributingFactors: ["Fallback heuristic used (ML service unavailable)"],
       };
+      // Cache the fallback too to prevent repeated Python spawn failures
+      setCachedRisk(spoilageCacheKey, fallback);
+      return fallback;
     }
   },
 
@@ -175,31 +189,48 @@ export const riskPredictionService = {
       route_reliability_feature: avg_reliability
     };
 
+    // Cache check for delay risk
+    const delayCacheKey = buildRiskCacheKey(
+      shipmentId || 'anonymous',
+      base_transit_hr,
+      transfer_count,
+      `delay::${transport_mode}`
+    );
+    const cachedDelay = getCachedRisk(delayCacheKey);
+    if (cachedDelay) {
+      console.log(`[RiskCache] Delay cache HIT for shipment=${shipmentId} mode=${transport_mode}`);
+      return cachedDelay;
+    }
+
     try {
       const scriptPath = path.join(__dirname, '../models/predict_delay.py');
       const jsonString = JSON.stringify(mlFeatures);
       const b64Payload = Buffer.from(jsonString).toString('base64');
       
-      const { stdout, stderr } = await execAsync(`python "${scriptPath}" "${b64Payload}"`);
+      const { stdout } = await execAsync(`python "${scriptPath}" "${b64Payload}"`);
       
       const result = JSON.parse(stdout.trim());
       if (result.error) throw new Error(result.error);
 
       const score = Math.round(result.probability * 100);
-      return {
+      const delayResult = {
         score,
         level: result.risk_category as 'low' | 'medium' | 'high' | 'critical',
         expectedDelayMinutes: Math.round(result.probability * 120), 
         contributingFactors: [`ML Model Prediction: ${score}% chance of delay (v1.0-rf-tabular)`],
       };
+      setCachedRisk(delayCacheKey, delayResult);
+      return delayResult;
     } catch (error) {
       console.error("[RiskPrediction] ML inference failed, falling back to heuristic.", error);
-      return {
+      const fallback = {
         score: 30,
-        level: 'medium',
+        level: 'medium' as const,
         expectedDelayMinutes: 45,
         contributingFactors: ["Fallback heuristic used (ML service unavailable)"],
       };
+      setCachedRisk(delayCacheKey, fallback);
+      return fallback;
     }
   },
 

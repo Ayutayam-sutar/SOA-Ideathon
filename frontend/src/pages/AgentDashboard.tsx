@@ -3,30 +3,21 @@ import { AppHeader } from '../components/AppHeader';
 import { FreshnessGauge } from '../components/FreshnessGauge';
 import { IncidentModal } from '../components/IncidentModal';
 import { KarwaanMap } from '../components/KarwaanMap';
-import { MapLegend } from '../components/MapLegend';
 import { dataService } from '../services/dataService';
-import { DeliveryRoute, Shipment, IncidentReport, User, RouteStop } from '../types';
+import { DeliveryRoute, Shipment, IncidentReport, User } from '../types';
 import {
-  Navigation,
   CheckCircle2,
   AlertTriangle,
   MapPin,
   Clock,
-  ThermometerSnowflake,
-  ShieldAlert,
-  Phone,
   Truck,
   Check,
-  Power,
-  EyeOff,
-  Navigation2,
-  PackageOpen
+  PackageOpen,
+  Flag,
+  LogOut,
 } from 'lucide-react';
 
 export const AgentDashboard: React.FC = () => {
-  // ----------------------------------------------------------------------
-  // 1. DATA & BACKEND STATE (UNTOUCHED)
-  // ----------------------------------------------------------------------
   const [user, setUser] = useState<User | null>(null);
   const [routes, setRoutes] = useState<DeliveryRoute[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -34,9 +25,15 @@ export const AgentDashboard: React.FC = () => {
 
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isFinishing, setIsFinishing] = useState(false);
+  const [isRouteCompleted, setIsRouteCompleted] = useState(false);
 
-  const myRouteId = user?.assignedRouteId || 'RT-MAHA-901';
-  const myRoute = routes.find((r) => r.id === myRouteId) || routes[0];
+  const myRouteId = user?.assignedRouteId;
+  const myRoute =
+    (myRouteId && routes.find((r) => r.id === myRouteId)) ||
+    routes.find((r) => r.status !== 'completed' && r.status !== 'scheduled') ||
+    routes.find((r) => r.status !== 'completed') ||
+    routes[0];
 
   useEffect(() => {
     const loadData = async () => {
@@ -61,6 +58,26 @@ export const AgentDashboard: React.FC = () => {
     setShipments(await dataService.getShipments());
   };
 
+  const handleFinishDelivery = async () => {
+    if (!myRoute || isFinishing) return;
+    setIsFinishing(true);
+    try {
+      await dataService.completeRoute(myRoute.id);
+      setIsRouteCompleted(true);
+      setRoutes(await dataService.getRoutes());
+      setShipments(await dataService.getShipments());
+    } catch (err: any) {
+      alert(`Failed to complete route: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setIsFinishing(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('karwaan_token');
+    window.location.href = '/';
+  };
+
   const { nextStop, completedStopsCount, totalStopsCount, progressPercent, activeIncidents } = useMemo(() => {
     if (!myRoute || !myRoute.stops) return { nextStop: null, completedStopsCount: 0, totalStopsCount: 0, progressPercent: 0, activeIncidents: [] };
     
@@ -78,9 +95,6 @@ export const AgentDashboard: React.FC = () => {
     };
   }, [myRoute, incidents]);
 
-  // ----------------------------------------------------------------------
-  // 2. LOADING & NO-ROUTE STATES
-  // ----------------------------------------------------------------------
   if (loading || !user) {
     return (
       <div className="min-h-screen bg-[#F8FAF7] flex items-center justify-center">
@@ -97,7 +111,10 @@ export const AgentDashboard: React.FC = () => {
       <div className="min-h-screen bg-[#F8FAF7] flex flex-col font-sans">
         <AppHeader user={user} activeRole="agent" />
         <main className="flex-1 flex items-center justify-center p-6">
-          <div className="bg-white border border-[#E5EBE3] rounded-2xl p-10 max-w-md w-full text-center shadow-sm">
+          <div className="bg-white border border-[#E5EBE3] rounded-2xl p-10 max-w-md w-full text-center shadow-sm relative">
+            <button onClick={handleLogout} className="absolute top-4 right-4 p-2 text-[#596560] hover:bg-[#F3F5F2] rounded-lg transition-colors">
+              <LogOut className="w-5 h-5" />
+            </button>
             <Truck className="w-16 h-16 text-[#D6DCD4] mx-auto mb-4" />
             <h2 className="font-display font-bold text-2xl text-[#163832] mb-2">No Active Route</h2>
             <p className="text-[#596560] text-sm leading-relaxed">You are currently unassigned. Dispatch will notify you when a new consolidation manifest is ready.</p>
@@ -107,14 +124,16 @@ export const AgentDashboard: React.FC = () => {
     );
   }
 
-  // ----------------------------------------------------------------------
-  // 3. STANDARD DASHBOARD (PREMIUM UI/UX)
-  // ----------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-[#F8FAF7] text-[#1A211E] flex flex-col font-sans pb-12">
       <AppHeader user={user} activeRole="agent" />
 
-      {/* Hero Banner */}
+      {isRouteCompleted && (
+        <div className="bg-[#5C7A50] text-white text-center py-3 px-4 font-bold text-sm flex items-center justify-center gap-2 border-b-2 border-[#435A3A]">
+          <CheckCircle2 className="w-4 h-4" /> Route marked DELIVERED. All shipments updated. Well done, Captain!
+        </div>
+      )}
+
       <div className="bg-[#163832] text-white border-b-4 border-[#D98E2B]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div>
@@ -129,16 +148,21 @@ export const AgentDashboard: React.FC = () => {
             </div>
             <h1 className="font-display font-black text-3xl sm:text-4xl tracking-tight">{myRoute.name}</h1>
           </div>
+          
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium transition-colors border border-white/20"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
         </div>
       </div>
 
       <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* LEFT COLUMN: Overview, Map & Telemetry */}
           <div className="lg:col-span-4 space-y-6">
-            
-            {/* Status & Progress Card */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#E5EBE3]">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-display font-bold text-lg text-[#163832]">Route Status</h3>
@@ -159,7 +183,6 @@ export const AgentDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Telemetry Strip */}
               <div className="grid grid-cols-3 gap-2 mt-8 border-t border-[#E5EBE3] pt-6">
                 <div className="text-center bg-[#F8FAF7] p-2 rounded-lg border border-[#E5EBE3]">
                   <span className="block text-[10px] font-bold tracking-widest text-[#596560] mb-1">CABIN</span>
@@ -178,7 +201,6 @@ export const AgentDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Live Map (Now visible on mobile devices too) */}
             <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-[#E5EBE3]">
               <h3 className="font-display font-bold text-base text-[#163832] mb-4 flex items-center gap-2">
                 <MapPin className="w-5 h-5 text-[#D98E2B]"/> Live Routing Map
@@ -192,11 +214,21 @@ export const AgentDashboard: React.FC = () => {
               onClick={() => setIsIncidentModalOpen(true)}
               className="w-full py-4 bg-white hover:bg-rose-50 border-2 border-[#B3462C] text-[#B3462C] rounded-xl font-bold transition-colors shadow-sm flex items-center justify-center gap-2"
             >
-              <AlertTriangle className="w-5 h-5" /> Report Issue / Breakdown
+              <AlertTriangle className="w-5 h-5" /> Report Incident
             </button>
+
+            {progressPercent === 100 && !isRouteCompleted && (
+              <button
+                onClick={handleFinishDelivery}
+                disabled={isFinishing}
+                className={`w-full py-5 rounded-xl font-bold text-base transition-all shadow-md flex items-center justify-center gap-3 border-2 bg-[#163832] hover:bg-[#0F2622] text-white border-[#163832] animate-pulse ${isFinishing ? 'opacity-60 cursor-not-allowed' : 'active:scale-95'}`}
+              >
+                <Flag className="w-5 h-5" />
+                {isFinishing ? 'Completing Delivery...' : '🎉 FINISH DELIVERY'}
+              </button>
+            )}
           </div>
 
-          {/* RIGHT COLUMN: Stop Itinerary */}
           <div className="lg:col-span-8">
             <h2 className="font-display font-bold text-2xl text-[#163832] px-1 mb-6">Manifest & Stop Sequence</h2>
             
@@ -213,7 +245,7 @@ export const AgentDashboard: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-5">
-                {myRoute.stops.map((stop, idx) => {
+                {myRoute.stops.map((stop) => {
                   const isCompleted = stop.isCompleted;
                   const isNext = !isCompleted && nextStop?.id === stop.id;
                   const stopShipments = shipments.filter((s) => stop.shipmentIds.includes(s.id));
@@ -225,13 +257,11 @@ export const AgentDashboard: React.FC = () => {
                         'border border-[#D6DCD4] shadow-sm hover:shadow-md'
                       }`}
                     >
-                      {/* Active indicator strip */}
                       {isNext && <div className="absolute top-0 left-0 w-2 h-full bg-[#D98E2B]" />}
                       
                       <div className="flex flex-col sm:flex-row gap-5 justify-between">
                         <div className="flex gap-5 flex-1">
                           
-                          {/* Sequence Number Bubble */}
                           <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black shrink-0 shadow-sm text-lg ${
                               isCompleted ? 'bg-[#5C7A50] text-white' : 
                               isNext ? 'bg-[#D98E2B] text-[#163832]' : 
@@ -255,7 +285,6 @@ export const AgentDashboard: React.FC = () => {
                             </h3>
                             <p className="text-sm text-[#596560] max-w-lg leading-relaxed">{stop.address}</p>
                             
-                            {/* Shipments Payload visual */}
                             {stopShipments.length > 0 && (
                               <div className="pt-4 flex flex-wrap gap-2">
                                 {stopShipments.map(shp => (
@@ -270,7 +299,6 @@ export const AgentDashboard: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Action Area for the Stop */}
                         <div className="mt-5 sm:mt-0 sm:ml-4 sm:w-44 flex flex-col justify-center">
                           {!isCompleted ? (
                              <button
@@ -302,7 +330,19 @@ export const AgentDashboard: React.FC = () => {
         </div>
       </main>
 
-      <IncidentModal isOpen={isIncidentModalOpen} onClose={() => setIsIncidentModalOpen(false)} routes={routes} shipments={shipments} preselectedRouteId={myRoute.id} />
+      <IncidentModal
+        isOpen={isIncidentModalOpen}
+        onClose={() => setIsIncidentModalOpen(false)}
+        routes={myRoute ? [myRoute] : routes}
+        shipments={shipments}
+        preselectedRouteId={myRoute.id}
+        variant="driver"
+        onIncidentSubmitted={async () => {
+          setIncidents(await dataService.getIncidents());
+          setRoutes(await dataService.getRoutes());
+          setShipments(await dataService.getShipments());
+        }}
+      />
     </div>
   );
 };

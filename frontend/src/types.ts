@@ -24,6 +24,7 @@ export type PerishableCategory =
   | 'citrus';
 
 export type ShipmentStatus =
+  | 'draft'
   | 'pending'
   | 'approved'
   | 'rejected'
@@ -112,6 +113,9 @@ export interface Shipment {
   spoilageRiskLevel?: 'low' | 'medium' | 'high' | 'critical';
   delayRiskScore?: number;
   delayRiskLevel?: 'low' | 'medium' | 'high' | 'critical';
+  rejectionReason?: string;
+  assignedVehicle?: string;
+  agreedCost?: number;
 }
 
 export type TransportMode = 'road_reefer' | 'rail_cold_wagon' | 'hub_transfer' | 'local_transport';
@@ -219,16 +223,27 @@ export type IncidentType =
   | 'vehicle_breakdown'
   | 'traffic_delay'
   | 'temperature_excursion'
-  | 'road_closure'
-  | 'other';
+  | 'weather_delay'
+  | 'hub_congestion'
+  | 'customs_delay';
 
 export type IncidentSeverity = 'moderate' | 'high' | 'critical';
+
+export const INCIDENT_TYPE_LABELS: Record<IncidentType, string> = {
+  vehicle_breakdown: 'Vehicle Breakdown',
+  temperature_excursion: 'Spoilage Risk',
+  traffic_delay: 'Delay',
+  weather_delay: 'Weather Delay',
+  hub_congestion: 'Hub Congestion',
+  customs_delay: 'Customs Delay',
+};
 
 export interface IncidentReport {
   id: string;
   code: string; // e.g. "INC-4092"
   routeId: string;
   routeCode: string;
+  vehicleId?: string;
   shipmentId: string;
   shipmentCode: string;
   cargoType: string;

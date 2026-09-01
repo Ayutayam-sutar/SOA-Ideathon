@@ -12,6 +12,7 @@ import {
   DeliveryRoute,
   IncidentReport,
   User,
+  INCIDENT_TYPE_LABELS,
 } from "../../types";
 
 export const AdminDashboard: React.FC = () => {
@@ -49,6 +50,14 @@ export const AdminDashboard: React.FC = () => {
       }
     };
     loadData();
+    const poll = setInterval(async () => {
+      try {
+        setIncidents(await dataService.getIncidents());
+      } catch {
+        /* keep last known list */
+      }
+    }, 8000);
+    return () => clearInterval(poll);
   }, []);
 
   const activeShipmentsCount = shipments.filter(
@@ -320,8 +329,9 @@ export const AdminDashboard: React.FC = () => {
                   </div>
 
                   <div className="font-semibold text-[#1A211E]">
-                    {incident.type.replace("_", " ").toUpperCase()} •{" "}
-                    {incident.cargoType}
+                    {INCIDENT_TYPE_LABELS[incident.type] ||
+                      incident.type?.replace(/_/g, " ").toUpperCase()}{" "}
+                    • {incident.cargoType}
                   </div>
 
                   <p className="text-[#596560] text-[11px] leading-relaxed">
@@ -355,6 +365,11 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
               ))}
+              {incidents.length === 0 && (
+                <div className="py-8 text-center text-xs text-[#596560] border border-dashed border-[#D6DCD4] rounded-[6px]">
+                  No driver incidents yet. Reports from the Delivery Agent dashboard appear here.
+                </div>
+              )}
             </div>
           </div>
         </div>
