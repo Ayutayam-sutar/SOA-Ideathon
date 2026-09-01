@@ -4,10 +4,12 @@ import { useNavigate } from "react-router-dom";
 
 import { FreshnessGauge } from "../../components/FreshnessGauge";
 import { dataService } from "../../services/dataService";
+import { CheckCircle2 } from "lucide-react";
 
 import {
   Shipment,
   ConsolidationCluster,
+  DeliveryRoute,
 } from "../../types";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -17,60 +19,36 @@ export const AdminClusters: React.FC = () => {
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [clusters, setClusters] = useState<ConsolidationCluster[]>([]);
+  const [routes, setRoutes] = useState<DeliveryRoute[]>([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
 
   const [selectedClusterId, setSelectedClusterId] =
     useState<string>("");
 
   const { hasAccess } = useAuth();
 
-  const [showRecommendations, setShowRecommendations] = useState(false);
-  const [recommendedClusters, setRecommendedClusters] = useState<ConsolidationCluster[]>([]);
-  const [clusterDetails, setClusterDetails] = useState<Record<string, { aiRoute: any, depTime: any }>>({});
-  const [isGenerating, setIsGenerating] = useState(false);
   const [dispatchingClusterId, setDispatchingClusterId] = useState<string | null>(null);
   const [dispatchSuccess, setDispatchSuccess] = useState<string | null>(null);
-
 
   useEffect(() => {
     const loadData = async () => {
       const currentClusters = await dataService.getClusters();
       setClusters(currentClusters);
       setShipments(await dataService.getShipments());
-
-      // Don't auto-select a cluster, wait for user click to open modal
-      // if (currentClusters.length > 0) {
-      //   setSelectedClusterId(currentClusters[0].id);
-      // }
+      const currentRoutes = await dataService.getRoutes();
+      setRoutes(currentRoutes);
+      if (currentRoutes.length > 0) {
+        setSelectedVehicleId(currentRoutes[0].vehicleId || currentRoutes[0].code);
+      }
     };
     loadData();
   }, []);
 
-  useEffect(() => {
-    // Generate AI recommendations on demand for pending shipments
-    if (showRecommendations && shipments.length > 0) {
-      const generate = async () => {
-        setIsGenerating(true);
-        try {
-          const recs = await dataService.recommendGrouping();
-          setRecommendedClusters(recs);
+  const visibleRoutes = routes.slice(0, 4);
 
-          const details: Record<string, any> = {};
-          for (const cluster of recs) {
-            const aiRoute = await dataService.recommendRoute(cluster.id, cluster.originHub.name, cluster.destinationHub.name);
-            const depTime = await dataService.recommendDepartureTime(cluster.id, cluster.shipmentIds, aiRoute);
-            details[cluster.id] = { aiRoute, depTime };
-          }
-          setClusterDetails(details);
-        } catch(e) {
-          console.error(e);
-        } finally {
-          setIsGenerating(false);
-        }
-      };
-      generate();
-    }
-  }, [showRecommendations, shipments]);
-
+  const activeAssignedRoute = visibleRoutes.find(
+    (r) => (r.vehicleId || r.code) === selectedVehicleId || r.id === selectedVehicleId || r.code === selectedVehicleId
+  ) || visibleRoutes[0];
 
   const handleDispatchCluster = async (cluster: ConsolidationCluster) => {
     try {
@@ -81,12 +59,12 @@ export const AdminClusters: React.FC = () => {
       const calculatedWeight = clusterShipments.reduce((sum, s) => sum + (s.weightKg || 0), 0);
       const totalWeightKg = calculatedWeight > 0 ? calculatedWeight : (cluster.totalWeightKg || 1000);
 
-      const assignedVehicleId = 'OD-02-AX-4592 (Tata 14T Reefer)';
+      const assignedVehicle = selectedVehicleId || visibleRoutes[0]?.vehicleId || visibleRoutes[0]?.code || 'OD-02-AX-4592 (Tata 14T Reefer)';
 
-      // 1. Assign vehicle to all shipments in the cluster
+      // 1. Assign chosen vehicle to all shipments in the cluster
       await Promise.all(
         cluster.shipmentIds.map((shipmentId: string) =>
-          dataService.assignVehicle(shipmentId, assignedVehicleId)
+          dataService.assignVehicle(shipmentId, assignedVehicle)
         )
       );
 
@@ -98,7 +76,7 @@ export const AdminClusters: React.FC = () => {
       setClusters(updatedClusters);
       setShipments(updatedShipments);
 
-      setDispatchSuccess(`Cluster ${cluster.code || cluster.id} (${totalWeightKg} kg) dispatched successfully! Reefer fleet en route.`);
+      setDispatchSuccess(`Cluster ${cluster.code || cluster.id} (${totalWeightKg} kg) assigned to ${assignedVehicle} and dispatched successfully!`);
       
       setTimeout(() => {
         setDispatchSuccess(null);
@@ -115,10 +93,23 @@ export const AdminClusters: React.FC = () => {
   const selectedCluster = selectedClusterId ? (
     clusters.find(
       (cluster) => cluster.id === selectedClusterId
-    ) || recommendedClusters.find(
-      (cluster) => cluster.id === selectedClusterId
     )
   ) : null;
+
+  const clusterShipments = selectedCluster ? shipments.filter(s => selectedCluster.shipmentIds.includes(s.id)) : [];
+  const isAlreadyDispatched = Boolean(
+    selectedCluster && (
+      selectedCluster.status === 'in_transit' ||
+      selectedCluster.status === 'dispatched' ||
+      selectedCluster.status === 'delivered' ||
+      (clusterShipments.length > 0 && clusterShipments.every(s => s.status === 'in_transit' || s.status === 'delivered'))
+    )
+  );
+
+  const existingAssignedVehicle = clusterShipments.find(s => s.assignedVehicle)?.assignedVehicle;
+  const currentAssignedVehicle = isAlreadyDispatched
+    ? (existingAssignedVehicle || selectedVehicleId || visibleRoutes[0]?.vehicleId || 'OD-02-AX-4592 (Tata 14T Reefer)')
+    : (selectedVehicleId || visibleRoutes[0]?.vehicleId || visibleRoutes[0]?.code || 'OD-02-AX-4592 (Tata 14T Reefer)');
 
   return (
     <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -131,94 +122,6 @@ export const AdminClusters: React.FC = () => {
           Multi-shipper cargo grouping and reefer capacity optimization
         </p>
       </div>
-
-      <div className="flex justify-between items-center bg-[#F3F5F2] border border-[#D6DCD4] rounded p-3">
-        <div>
-          <h2 className="font-display font-bold text-sm text-[#163832]">AI Recommended Plan</h2>
-          <p className="text-[11px] text-[#596560]">Auto-group pending shipments using predictive capacity and temp-compatibility modeling.</p>
-        </div>
-        <button
-          onClick={() => setShowRecommendations(!showRecommendations)}
-          className="px-4 py-1.5 bg-[#5C7A50] text-white rounded text-xs font-mono font-semibold hover:bg-[#4A6340] transition-colors"
-          disabled={isGenerating}
-        >
-          {isGenerating ? "Generating..." : showRecommendations ? "Hide Recommendations" : "Generate Recommendations ✨"}
-        </button>
-      </div>
-
-      {showRecommendations && (
-        <div className="border border-[#5C7A50]/40 bg-[#5C7A50]/5 rounded-[6px] p-4 space-y-4 shadow-sm mb-6">
-          <h3 className="font-display font-bold text-lg text-[#163832]">Recommended Clusters</h3>
-          {recommendedClusters.length === 0 ? (
-            <p className="text-sm text-[#596560]">No pending shipments require consolidation at this time.</p>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {recommendedClusters.map(cluster => {
-                const details = clusterDetails[cluster.id];
-                const aiRoute = details?.aiRoute;
-                const depTime = details?.depTime;
-
-                return (
-                  <div 
-                    key={cluster.id} 
-                    onClick={() => setSelectedClusterId(cluster.id)}
-                    className={`bg-white border-2 rounded p-4 cursor-pointer transition-all duration-200 ${
-                      selectedClusterId === cluster.id 
-                        ? 'border-[#5C7A50] shadow-md ring-1 ring-[#5C7A50]' 
-                        : 'border-[#5C7A50]/30 hover:border-[#5C7A50]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-mono font-bold text-xs px-2 py-0.5 bg-[#5C7A50] text-white rounded">
-                        ✨ RECOMMENDED
-                      </span>
-                      {hasAccess('cost_savings') && (
-                        <span className="font-mono text-[11px] font-bold text-[#5C7A50]">
-                          ~{cluster.costSavingsPercent}% Cost Saved
-                        </span>
-                      )}
-                    </div>
-                    <h4 className="font-display font-bold text-base text-[#163832] mb-1">{cluster.name}</h4>
-                    
-                    <div className="text-xs text-[#596560] mb-3">
-                      <strong>Hub:</strong> {cluster.originHub.name} → {cluster.destinationHub.name}
-                    </div>
-
-                    {!details ? (
-                      <div className="text-xs text-[#596560] py-4 text-center animate-pulse">Running Multi-Objective Optimization...</div>
-                    ) : (
-                      <>
-                        <div className="bg-[#F8FAF7] border border-[#E5EBE3] p-2 rounded mb-3 text-[11px]">
-                          <div className="font-bold text-[#163832] mb-1">AI Route Strategy:</div>
-                          <p className="text-[#596560] mb-1">{aiRoute?.explanation?.multimodalAdvantage}</p>
-                          <div className="flex gap-2">
-                            {aiRoute?.legs?.map((leg: any, idx: number) => (
-                              <span key={leg.id} className="font-mono bg-[#E5EBE3] px-1 rounded">{idx + 1}. {leg.mode.replace('_', ' ').toUpperCase()}</span>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="bg-[#F3F5F2] border border-[#D6DCD4] p-2 rounded mb-3 text-[11px]">
-                          <div className="font-bold text-[#B3462C] mb-1">AI Departure Schedule:</div>
-                          <p className="text-[#596560] mb-1">{depTime?.reasoning}</p>
-                          <div className="font-mono font-bold text-[#163832] mt-1">
-                            Window: {depTime?.departureWindow?.earliest} - {depTime?.departureWindow?.latest}
-                          </div>
-                        </div>
-
-                        <div className="bg-[#F3F5F2] p-2.5 rounded text-[11px] font-mono text-[#596560] space-y-1">
-                          <div>Temp Sync: <span className="text-[#163832] font-semibold">{cluster.tempBand}</span></div>
-                          <div>Grouped Shipments: <span className="text-[#163832] font-semibold">{cluster.shipmentIds.length} Consignments</span></div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
@@ -313,7 +216,7 @@ export const AdminClusters: React.FC = () => {
       {selectedCluster && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#163832]/80 backdrop-blur-sm">
           <div className="bg-[#FFFFFF] rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between border-b border-[#E5EBE3] p-5 bg-[#F8FAF7]">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-[#E5EBE3] p-5 bg-[#F8FAF7] gap-4">
               <div>
                 <div className="flex items-center gap-3 mb-1">
                   <span className="font-mono font-bold text-xs px-2 py-0.5 bg-[#163832] text-white rounded">
@@ -323,51 +226,91 @@ export const AdminClusters: React.FC = () => {
                     {selectedCluster.name}
                   </h3>
                 </div>
-                <span className="font-mono text-xs text-[#596560]">
-                  Assigned Multimodal Route:{" "}
-                  {selectedCluster.assignedRouteId || 'Pending AI Generation'}
-                </span>
+                <div className="flex items-center gap-2 font-mono text-xs text-[#596560]">
+                  <span>Assigned Corridor:</span>
+                  <span className="font-bold text-[#163832]">
+                    {activeAssignedRoute ? `Route ${activeAssignedRoute.code}` : (selectedCluster.assignedRouteId || 'Pending Allocation')}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex items-center gap-4">
-                {selectedCluster.assignedRouteId && (
+              <div className="flex flex-wrap items-center gap-3">
+                {isAlreadyDispatched ? (
+                  <>
+                    <div className="flex items-center gap-2 bg-[#163832]/10 border border-[#163832]/20 px-3 py-1.5 rounded-lg shadow-sm">
+                      <span className="font-mono text-xs text-[#596560]">Assigned Fleet:</span>
+                      <span className="font-mono text-xs font-bold text-[#163832]">
+                        🚚 {currentAssignedVehicle}
+                      </span>
+                    </div>
+                    <span className="px-3 py-1.5 rounded-lg text-xs font-mono font-bold bg-[#5C7A50]/15 text-[#5C7A50] border border-[#5C7A50]/30 flex items-center gap-1.5 shadow-sm">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> FLEET DISPATCHED
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {/* Fleet Vehicle Dropdown Selector (only visible routes/vehicles from Routes page) */}
+                    <div className="flex items-center gap-2 bg-white border border-[#D6DCD4] px-3 py-1.5 rounded-lg shadow-sm">
+                      <label className="font-mono text-xs font-bold text-[#163832] uppercase whitespace-nowrap">
+                        Fleet Vehicle:
+                      </label>
+                      <select
+                        value={selectedVehicleId}
+                        onChange={(e) => setSelectedVehicleId(e.target.value)}
+                        className="bg-transparent text-xs font-mono font-bold text-[#163832] focus:outline-none cursor-pointer max-w-[220px] truncate"
+                      >
+                        {visibleRoutes.map((route) => {
+                          const vehVal = route.vehicleId || route.code;
+                          const vehLabel = route.vehicleId ? `${route.vehicleId} [${route.code}]` : `Route ${route.code}`;
+                          return (
+                            <option key={route.id} value={vehVal}>
+                              🚚 {vehLabel}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
+                    <button 
+                      onClick={() => selectedCluster && handleDispatchCluster(selectedCluster)}
+                      disabled={dispatchingClusterId === selectedCluster.id}
+                      id="dispatch-btn"
+                      className={`px-4 py-2 text-white rounded-lg text-xs font-mono font-semibold transition-all shadow-sm flex items-center gap-2 whitespace-nowrap ${
+                        dispatchingClusterId === selectedCluster.id
+                          ? 'bg-emerald-700 cursor-not-allowed opacity-90'
+                          : 'bg-emerald-600 hover:bg-emerald-700 active:scale-95'
+                      }`}
+                    >
+                      {dispatchingClusterId === selectedCluster.id ? (
+                        <>
+                          <svg className="animate-spin h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                          </svg>
+                          Dispatching...
+                        </>
+                      ) : (
+                        'Dispatch Fleet 🚚'
+                      )}
+                    </button>
+                  </>
+                )}
+
+                {activeAssignedRoute && (
                   <button
                     type="button"
                     onClick={() =>
                       navigate("/admin/routes", {
                         state: {
-                          selectedRouteId:
-                            selectedCluster.assignedRouteId,
+                          selectedRouteId: activeAssignedRoute.id,
                         },
                       })
                     }
-                    className="px-4 py-2 bg-[#163832] text-white rounded-lg text-xs font-mono font-semibold hover:bg-[#0F2622] transition-colors shadow-sm"
+                    className="px-3.5 py-2 bg-[#163832] text-white rounded-lg text-xs font-mono font-semibold hover:bg-[#0F2622] transition-colors shadow-sm whitespace-nowrap"
                   >
                     View Assigned Route Logic →
                   </button>
                 )}
-                <button 
-                  onClick={() => selectedCluster && handleDispatchCluster(selectedCluster)}
-                  disabled={dispatchingClusterId === selectedCluster.id}
-                  id="dispatch-btn"
-                  className={`px-4 py-2 text-white rounded-lg text-xs font-mono font-semibold transition-all shadow-sm flex items-center gap-2 ${
-                    dispatchingClusterId === selectedCluster.id
-                      ? 'bg-emerald-700 cursor-not-allowed opacity-90'
-                      : 'bg-emerald-600 hover:bg-emerald-700 active:scale-95'
-                  }`}
-                >
-                  {dispatchingClusterId === selectedCluster.id ? (
-                    <>
-                      <svg className="animate-spin h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                      </svg>
-                      Dispatching...
-                    </>
-                  ) : (
-                    'Dispatch Fleet 🚚'
-                  )}
-                </button>
                 <button 
                   onClick={() => setSelectedClusterId("")}
                   className="text-gray-400 hover:text-gray-600 transition-colors bg-gray-100 hover:bg-gray-200 rounded-full p-2"
@@ -419,6 +362,11 @@ export const AdminClusters: React.FC = () => {
                       shipment.id
                     )
                   )
+                  .sort((a, b) => {
+                    const timeA = new Date(a.createdAt || a.dispatchTime || 0).getTime();
+                    const timeB = new Date(b.createdAt || b.dispatchTime || 0).getTime();
+                    return timeB - timeA;
+                  })
                   .map((shipment) => (
                     <div
                       key={shipment.id}

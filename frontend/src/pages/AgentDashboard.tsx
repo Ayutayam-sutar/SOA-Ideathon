@@ -28,6 +28,8 @@ export const AgentDashboard: React.FC = () => {
   const [isFinishing, setIsFinishing] = useState(false);
   const [isRouteCompleted, setIsRouteCompleted] = useState(false);
 
+  const [completedStopIds, setCompletedStopIds] = useState<Set<string>>(new Set());
+
   const myRouteId = user?.assignedRouteId;
   const myRoute =
     (myRouteId && routes.find((r) => r.id === myRouteId)) ||
@@ -53,9 +55,33 @@ export const AgentDashboard: React.FC = () => {
   }, []);
 
   const handleMarkStopComplete = async (stopId: string) => {
-    await dataService.markStopCompleted(myRoute.id, stopId);
-    setRoutes(await dataService.getRoutes());
-    setShipments(await dataService.getShipments());
+    if (!myRoute) return;
+    const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    // Instantly track completed stop in component state
+    setCompletedStopIds((prev) => new Set(prev).add(stopId));
+
+    // Optimistically update stops state in UI
+    setRoutes((prev) =>
+      prev.map((r) => {
+        if (r.id === myRoute.id) {
+          const updatedStops = (r.stops || []).map((s) =>
+            s.id === stopId ? { ...s, isCompleted: true, completedTime: timeStr } : s
+          );
+          return { ...r, stops: updatedStops };
+        }
+        return r;
+      })
+    );
+
+    try {
+      await dataService.markStopCompleted(myRoute.id, stopId);
+      const [r, s] = await Promise.all([dataService.getRoutes(), dataService.getShipments()]);
+      setRoutes(r);
+      setShipments(s);
+    } catch (err: any) {
+      console.error("Failed to mark stop completed:", err);
+    }
   };
 
   const handleFinishDelivery = async () => {
@@ -64,8 +90,9 @@ export const AgentDashboard: React.FC = () => {
     try {
       await dataService.completeRoute(myRoute.id);
       setIsRouteCompleted(true);
-      setRoutes(await dataService.getRoutes());
-      setShipments(await dataService.getShipments());
+      const [r, s] = await Promise.all([dataService.getRoutes(), dataService.getShipments()]);
+      setRoutes(r);
+      setShipments(s);
     } catch (err: any) {
       alert(`Failed to complete route: ${err?.message || 'Unknown error'}`);
     } finally {
@@ -81,8 +108,8 @@ export const AgentDashboard: React.FC = () => {
   const { nextStop, completedStopsCount, totalStopsCount, progressPercent, activeIncidents } = useMemo(() => {
     if (!myRoute || !myRoute.stops) return { nextStop: null, completedStopsCount: 0, totalStopsCount: 0, progressPercent: 0, activeIncidents: [] };
     
-    const next = myRoute.stops.find(s => !s.isCompleted);
-    const completed = myRoute.stops.filter(s => s.isCompleted).length;
+    const next = myRoute.stops.find(s => !s.isCompleted && !completedStopIds.has(s.id));
+    const completed = myRoute.stops.filter(s => s.isCompleted || completedStopIds.has(s.id)).length;
     const total = myRoute.stops.length;
     const activeInc = incidents.filter(i => i.routeId === myRoute.id && i.status === 'open');
     
@@ -93,7 +120,7 @@ export const AgentDashboard: React.FC = () => {
       progressPercent: total === 0 ? 0 : Math.round((completed / total) * 100),
       activeIncidents: activeInc
     };
-  }, [myRoute, incidents]);
+  }, [myRoute, incidents, completedStopIds]);
 
   if (loading || !user) {
     return (
@@ -246,9 +273,10 @@ export const AgentDashboard: React.FC = () => {
             ) : (
               <div className="space-y-5">
                 {myRoute.stops.map((stop) => {
-                  const isCompleted = stop.isCompleted;
+                  const isCompleted = stop.isCompleted || completedStopIds.has(stop.id);
                   const isNext = !isCompleted && nextStop?.id === stop.id;
                   const stopShipments = shipments.filter((s) => stop.shipmentIds.includes(s.id));
+                  const displayTime = stop.completedTime || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
                   return (
                     <div key={stop.id} className={`bg-white rounded-2xl p-6 transition-all relative overflow-hidden ${
@@ -316,7 +344,7 @@ export const AgentDashboard: React.FC = () => {
                           ) : (
                             <div className="w-full py-3 bg-[#F8FAF7] text-[#5C7A50] border border-[#E5EBE3] rounded-xl text-center text-sm font-bold flex flex-col items-center justify-center gap-1.5 shadow-inner">
                               <CheckCircle2 className="w-6 h-6" />
-                              <span className="text-[10px] uppercase font-mono tracking-widest opacity-80">Done at {stop.completedTime}</span>
+                              <span className="text-[10px] uppercase font-mono tracking-widest opacity-80">Done at {displayTime}</span>
                             </div>
                           )}
                         </div>
@@ -324,6 +352,31 @@ export const AgentDashboard: React.FC = () => {
                     </div>
                   );
                 })}
+
+                {progressPercent === 100 && !isRouteCompleted && (
+                  <div className="bg-[#163832] border-2 border-[#D98E2B] rounded-2xl p-6 text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-5 animate-in fade-in zoom-in duration-300">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <CheckCircle2 className="w-5 h-5 text-[#D98E2B]" />
+                        <h4 className="font-display font-black text-xl text-[#F8FAF7]">All Waypoints Successfully Completed!</h4>
+                      </div>
+                      <p className="text-xs text-white/80 font-mono">
+                        Consignment delivery verified at destination. Click below to close the manifest and update all shipment states.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleFinishDelivery}
+                      disabled={isFinishing}
+                      className={`px-8 py-4 rounded-xl font-bold text-base transition-all shadow-md flex items-center justify-center gap-3 bg-[#D98E2B] hover:bg-[#C07B20] text-[#163832] whitespace-nowrap active:scale-95 ${
+                        isFinishing ? 'opacity-60 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      <Flag className="w-5 h-5" />
+                      {isFinishing ? 'Completing Delivery...' : '🎉 FINISH DELIVERY'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -33,26 +33,30 @@ export const AdminRoutes: React.FC = () => {
             | null
         )?.selectedRouteId;
 
+      const visibleRoutes = currentRoutes.slice(0, 4);
+
       if (
         requestedRoute &&
-        currentRoutes.some(
+        visibleRoutes.some(
           (route) => route.id === requestedRoute
         )
       ) {
         setSelectedRouteId(requestedRoute);
       } else {
         setSelectedRouteId(
-          currentRoutes[0]?.id || ""
+          visibleRoutes[0]?.id || ""
         );
       }
     };
     loadData();
   }, [location.state]);
 
+  const visibleRoutes = routes.slice(0, 4);
+
   const selectedRoute =
-    routes.find(
+    visibleRoutes.find(
       (route) => route.id === selectedRouteId
-    ) || routes[0];
+    ) || visibleRoutes[0];
 
   const handleReoptimizeRoute = async (
     routeId: string,
@@ -108,22 +112,25 @@ export const AdminRoutes: React.FC = () => {
       )}
 
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {routes.map((route) => (
+        {visibleRoutes.map((route) => (
           <button
             key={route.id}
             type="button"
             onClick={() =>
               setSelectedRouteId(route.id)
             }
-            className={`px-4 py-2 rounded text-xs font-mono transition-all whitespace-nowrap border ${
+            className={`px-4 py-2 rounded text-xs font-mono transition-all whitespace-nowrap border flex items-center gap-2 ${
               selectedRouteId === route.id
                 ? "bg-[#163832] text-white border-[#163832] font-bold shadow-sm"
                 : "bg-[#FFFFFF] text-[#596560] border-[#D6DCD4] hover:border-[#163832]"
             }`}
           >
             <span>Route: {route.code}</span>
+            <span className="opacity-75 text-[11px] font-normal">
+              • {route.vehicleId?.split('(')[0]?.trim() || 'Tata Reefer'}
+            </span>
 
-            <span className="ml-2 text-[10px] opacity-80">
+            <span className="ml-1 text-[10px] opacity-80">
               (
               {route.status === "incident_reported"
                 ? "⚠️ DISRUPTED"
@@ -149,30 +156,43 @@ export const AdminRoutes: React.FC = () => {
           </div>
 
           <div className="lg:col-span-5 space-y-4">
-            <div className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm">
-              <h4 className="font-display font-bold text-sm text-[#163832] mb-3">
-                Route Geography & Active Vehicle
-              </h4>
+            <div className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-display font-bold text-sm text-[#163832]">
+                  Route Geography & Active Vehicle
+                </h4>
+                <span className="bg-[#5C7A50]/15 text-[#5C7A50] text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-[#5C7A50]/20">
+                  LIVE FLEET
+                </span>
+              </div>
+
+              <div className="bg-[#F8FAF7] border border-[#E5EBE3] p-2.5 rounded text-xs space-y-1">
+                <div className="flex items-center justify-between font-mono">
+                  <span className="font-bold text-[#163832]">🚚 {selectedRoute.vehicleId || 'OD-02-AX-4592 (Tata 14T Reefer)'}</span>
+                  <span className="text-[#5C7A50] font-bold text-[11px]">ACTIVE</span>
+                </div>
+                <div className="text-[11px] text-[#596560] flex items-center justify-between">
+                  <span>Pilot: {selectedRoute.driverAgentName || 'Active Fleet Pilot'}</span>
+                  <span className="font-mono">{selectedRoute.driverAgentPhone || '+91 94370 00199'}</span>
+                </div>
+              </div>
 
               <KarwaanMap
                 routes={[selectedRoute]}
                 selectedRouteId={selectedRoute.id}
-                height="240px"
+                height="220px"
               />
             </div>
 
             <div className="bg-[#FFFFFF] border border-[#D6DCD4] rounded-[6px] p-4 shadow-sm space-y-3">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center border-b border-[#E5EBE3] pb-2">
                 <h4 className="font-display font-bold text-sm text-[#163832]">
                   Ordered Stops & Waypoints
                 </h4>
-                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
-                  Multi-Stop Enabled
+                <span className="text-xs font-mono text-[#596560]">
+                  {selectedRoute.stops.length} Sequence Nodes
                 </span>
               </div>
-              <p className="text-[11px] text-[#596560] leading-snug">
-                Route includes dynamic intermediate drops (e.g. Balasore/Bhadrak) to distribute partial cargo loads while maintaining the cold chain.
-              </p>
 
               <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                 {selectedRoute.stops.map((stop) => (

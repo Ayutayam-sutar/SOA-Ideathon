@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../db';
 import { consolidationClusters, clusterShipments, shipments } from '../db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, desc } from 'drizzle-orm';
 import { getClusterHubs, getLocationCoords } from '../services/locationHelper';
 
 export const getClusters = async (req: Request, res: Response, next: NextFunction) => {
@@ -24,22 +24,22 @@ export const getClusters = async (req: Request, res: Response, next: NextFunctio
       if (validClusterIds.length === 0) return res.status(200).json([]);
     }
 
-    // 2. Fetch Clusters
-    let query = db.select().from(consolidationClusters);
+    // 2. Fetch Clusters (newest first)
+    let query = db.select().from(consolidationClusters).orderBy(desc(consolidationClusters.createdAt));
     if (validClusterIds && validClusterIds.length > 0) {
       query = query.where(inArray(consolidationClusters.id, validClusterIds)) as any;
     }
     const results = await query;
     if (results.length === 0) return res.status(200).json([]);
 
-    // 3. Batch Fetch Mappings & Shipments (Eliminates N+1 Query loop)
+    // 3. Batch Fetch Mappings & Shipments (Eliminates N+1 Query loop, newest first)
     const resultIds = results.map(r => r.id);
     const allMappings = await db.select().from(clusterShipments).where(inArray(clusterShipments.clusterId, resultIds));
     const allShipmentIds = allMappings.map(m => m.shipmentId);
     
     let allShipments: any[] = [];
     if (allShipmentIds.length > 0) {
-      allShipments = await db.select().from(shipments).where(inArray(shipments.id, allShipmentIds));
+      allShipments = await db.select().from(shipments).where(inArray(shipments.id, allShipmentIds)).orderBy(desc(shipments.createdAt));
     }
 
     // 4. Dynamically Calculate Real Cluster Data
