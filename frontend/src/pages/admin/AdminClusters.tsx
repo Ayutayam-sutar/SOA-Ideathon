@@ -61,14 +61,26 @@ export const AdminClusters: React.FC = () => {
 
       const assignedVehicle = selectedVehicleId || visibleRoutes[0]?.vehicleId || visibleRoutes[0]?.code || 'OD-02-AX-4592 (Tata 14T Reefer)';
 
-      // 1. Assign chosen vehicle to all shipments in the cluster
+      // 1. Assign chosen vehicle to all shipments in the cluster (sets status → in_transit)
       await Promise.all(
         cluster.shipmentIds.map((shipmentId: string) =>
           dataService.assignVehicle(shipmentId, assignedVehicle)
         )
       );
 
-      // 2. Refresh cluster and shipment datasets
+      // 2. Update cluster status to 'in_transit' so the backend can cascade on completion
+      await dataService.updateClusterStatus(cluster.id, 'in_transit');
+
+      // 3. Link the delivery route that uses this vehicle to this cluster
+      //    so completeRoute can find it and cascade delivery status correctly
+      const matchingRoute = visibleRoutes.find(r =>
+        r.vehicleId === assignedVehicle || r.vehicleId?.startsWith(assignedVehicle.split(' ')[0])
+      );
+      if (matchingRoute) {
+        await dataService.linkRouteToCluster(matchingRoute.id, cluster.id);
+      }
+
+      // 4. Refresh cluster and shipment datasets
       const [updatedClusters, updatedShipments] = await Promise.all([
         dataService.getClusters(),
         dataService.getShipments()
@@ -89,6 +101,7 @@ export const AdminClusters: React.FC = () => {
       setDispatchingClusterId(null);
     }
   };
+
 
   const selectedCluster = selectedClusterId ? (
     clusters.find(
@@ -123,94 +136,190 @@ export const AdminClusters: React.FC = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* ── Pending / Active Clusters ── */}
+      {(() => {
+        const pendingClusters = clusters.filter(
+          c => c.status !== 'delivered' && c.status !== 'completed'
+        );
+        return (
+          <section>
+            <h2 className="font-display font-semibold text-base text-[#163832] mb-3 flex items-center gap-2">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#D98E2B]" />
+              Pending Clusters
+              <span className="text-xs font-mono font-normal text-[#596560]">({pendingClusters.length})</span>
+            </h2>
 
-        {clusters.map((cluster) => {
-          const isSelected =
-            cluster.id === selectedClusterId;
-
-          return (
-            <div
-              key={cluster.id}
-              onClick={() =>
-                setSelectedClusterId(cluster.id)
-              }
-              className={`bg-[#FFFFFF] border-2 rounded-[6px] p-5 cursor-pointer transition-all duration-200 ${
-                isSelected
-                  ? "border-[#163832] shadow-md ring-1 ring-[#163832]"
-                  : "border-[#D6DCD4] hover:border-[#5C7A50]"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-mono font-bold text-xs px-2 py-0.5 bg-[#163832] text-white rounded">
-                  {cluster.code}
-                </span>
-
-                {hasAccess('cost_savings') && (
-                  <span className="font-mono text-[11px] font-bold text-[#5C7A50]">
-                    +{cluster.costSavingsPercent}% Cost Saved
-                  </span>
-                )}
+            {pendingClusters.length === 0 ? (
+              <div className="text-sm text-[#596560] bg-[#F3F5F2] rounded-lg px-4 py-6 text-center font-mono">
+                No pending clusters — all approved shipments have been dispatched or are awaiting approval.
               </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {pendingClusters.map((cluster) => {
+                  const isSelected = cluster.id === selectedClusterId;
+                  return (
+                    <div
+                      key={cluster.id}
+                      onClick={() => setSelectedClusterId(cluster.id)}
+                      className={`bg-[#FFFFFF] border-2 rounded-[6px] p-5 cursor-pointer transition-all duration-200 ${
+                        isSelected
+                          ? "border-[#163832] shadow-md ring-1 ring-[#163832]"
+                          : "border-[#D6DCD4] hover:border-[#5C7A50]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-mono font-bold text-xs px-2 py-0.5 bg-[#163832] text-white rounded">
+                          {cluster.code}
+                        </span>
 
-              <h4 className="font-display font-bold text-base text-[#163832] mb-1">
-                {cluster.name}
-              </h4>
+                        {hasAccess('cost_savings') && (
+                          <span className="font-mono text-[11px] font-bold text-[#5C7A50]">
+                            +{cluster.costSavingsPercent}% Cost Saved
+                          </span>
+                        )}
+                      </div>
 
-              <div className="text-xs text-[#596560] mb-3">
-                <strong>Hub:</strong>{" "}
-                {cluster.originHub.name} →{" "}
-                {cluster.destinationHub.name}
+                      <h4 className="font-display font-bold text-base text-[#163832] mb-1">
+                        {cluster.name}
+                      </h4>
+
+                      <div className="text-xs text-[#596560] mb-3">
+                        <strong>Hub:</strong>{" "}
+                        {cluster.originHub.name} →{" "}
+                        {cluster.destinationHub.name}
+                      </div>
+
+                      <div className="space-y-1 mb-3">
+                        <div className="flex justify-between text-[11px] font-mono text-[#596560]">
+                          <span>Capacity Utilization</span>
+
+                          <span className="font-bold text-[#163832]">
+                            {cluster.totalWeightKg} /{" "}
+                            {cluster.maxCapacityKg} kg (
+                            {cluster.reeferLoadFactorPercent}%)
+                          </span>
+                        </div>
+
+                        <div className="w-full bg-[#E5EBE3] h-2 rounded-full overflow-hidden">
+                          <div
+                            className="bg-[#5C7A50] h-full rounded-full transition-all"
+                            style={{
+                              width: `${cluster.reeferLoadFactorPercent}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="bg-[#F3F5F2] p-2.5 rounded text-[11px] font-mono text-[#596560] space-y-1">
+                        <div>
+                          Temp Sync:{" "}
+                          <span className="text-[#163832] font-semibold">
+                            {cluster.tempBand}
+                          </span>
+                        </div>
+
+                        <div>
+                          Grouped Shipments:{" "}
+                          <span className="text-[#163832] font-semibold">
+                            {cluster.shipmentIds.length} Consignments
+                          </span>
+                        </div>
+
+                        <div>
+                          CO₂ Reduction:{" "}
+                          <span className="text-[#5C7A50] font-semibold">
+                            -{cluster.co2SavedKg} kg
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+            )}
+          </section>
+        );
+      })()}
 
-              <div className="space-y-1 mb-3">
-                <div className="flex justify-between text-[11px] font-mono text-[#596560]">
-                  <span>Capacity Utilization</span>
+      {/* ── Completed Clusters ── */}
+      {(() => {
+        const completedClusters = clusters.filter(
+          c => c.status === 'delivered' || c.status === 'completed'
+        );
+        if (completedClusters.length === 0) return null;
+        return (
+          <section>
+            <h2 className="font-display font-semibold text-base text-[#163832] mb-3 flex items-center gap-2">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#5C7A50]" />
+              Completed Clusters
+              <span className="text-xs font-mono font-normal text-[#596560]">({completedClusters.length})</span>
+            </h2>
 
-                  <span className="font-bold text-[#163832]">
-                    {cluster.totalWeightKg} /{" "}
-                    {cluster.maxCapacityKg} kg (
-                    {cluster.reeferLoadFactorPercent}%)
-                  </span>
-                </div>
-
-                <div className="w-full bg-[#E5EBE3] h-2 rounded-full overflow-hidden">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {completedClusters.map((cluster) => {
+                const isSelected = cluster.id === selectedClusterId;
+                return (
                   <div
-                    className="bg-[#5C7A50] h-full rounded-full transition-all"
-                    style={{
-                      width: `${cluster.reeferLoadFactorPercent}%`,
-                    }}
-                  />
-                </div>
-              </div>
+                    key={cluster.id}
+                    onClick={() => setSelectedClusterId(cluster.id)}
+                    className={`bg-gray-50 border-2 rounded-[6px] p-5 cursor-pointer transition-all duration-200 opacity-80 ${
+                      isSelected
+                        ? "border-[#163832] shadow-md ring-1 ring-[#163832] opacity-100"
+                        : "border-gray-200 hover:border-[#5C7A50] hover:opacity-100"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-mono font-bold text-xs px-2 py-0.5 bg-gray-500 text-white rounded">
+                        {cluster.code}
+                      </span>
 
-              <div className="bg-[#F3F5F2] p-2.5 rounded text-[11px] font-mono text-[#596560] space-y-1">
-                <div>
-                  Temp Sync:{" "}
-                  <span className="text-[#163832] font-semibold">
-                    {cluster.tempBand}
-                  </span>
-                </div>
+                      <span className="font-mono text-[11px] font-bold text-[#5C7A50] flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Delivered
+                      </span>
+                    </div>
 
-                <div>
-                  Grouped Shipments:{" "}
-                  <span className="text-[#163832] font-semibold">
-                    {cluster.shipmentIds.length} Consignments
-                  </span>
-                </div>
+                    <h4 className="font-display font-bold text-base text-gray-600 mb-1">
+                      {cluster.name}
+                    </h4>
 
-                <div>
-                  CO₂ Reduction:{" "}
-                  <span className="text-[#5C7A50] font-semibold">
-                    -{cluster.co2SavedKg} kg
-                  </span>
-                </div>
-              </div>
+                    <div className="text-xs text-gray-500 mb-3">
+                      <strong>Hub:</strong>{" "}
+                      {cluster.originHub.name} →{" "}
+                      {cluster.destinationHub.name}
+                    </div>
+
+                    <div className="bg-gray-100 p-2.5 rounded text-[11px] font-mono text-gray-500 space-y-1">
+                      <div>
+                        Grouped Shipments:{" "}
+                        <span className="text-gray-700 font-semibold">
+                          {cluster.shipmentIds.length} Consignments
+                        </span>
+                      </div>
+
+                      {hasAccess('cost_savings') && (
+                        <div>
+                          Cost Saved:{" "}
+                          <span className="text-[#5C7A50] font-semibold">
+                            +{cluster.costSavingsPercent}%
+                          </span>
+                        </div>
+                      )}
+
+                      <div>
+                        CO₂ Reduction:{" "}
+                        <span className="text-[#5C7A50] font-semibold">
+                          -{cluster.co2SavedKg} kg
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </section>
+        );
+      })()}
 
-      </div>
 
       {/* Cluster Details Modal */}
       {selectedCluster && (

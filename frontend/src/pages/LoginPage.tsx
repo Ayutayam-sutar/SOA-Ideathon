@@ -207,11 +207,40 @@ export const LoginPage: React.FC = () => {
                 </button>
               </div>
 
+              {role === 'agent' && (
+                <div className="pt-2">
+                  <div className="relative my-3">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-[#E5EBE3]"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs">
+                      <span className="bg-white px-2 font-mono text-[10px] text-[#596560] uppercase">or</span>
+                    </div>
+                  </div>
+                  <Link
+                    to="/register/agent"
+                    className="w-full py-2.5 px-4 rounded border-2 border-[#D98E2B] text-[#D98E2B] hover:bg-[#D98E2B]/10 font-sans font-bold text-xs tracking-wide transition-all shadow-sm flex items-center justify-center gap-2 text-center"
+                  >
+                    <span>Register as Delivery Agent →</span>
+                  </Link>
+                </div>
+              )}
+
               {role === 'business' && (
-                <div className="text-center pt-1">
-                  <span className="text-[#596560]">New business? </span>
-                  <Link to={`/register`} className="text-[#5C7A50] font-bold hover:underline">
-                    Create an account
+                <div className="pt-2">
+                  <div className="relative my-3">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-[#E5EBE3]"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs">
+                      <span className="bg-white px-2 font-mono text-[10px] text-[#596560] uppercase">or</span>
+                    </div>
+                  </div>
+                  <Link
+                    to="/register/business"
+                    className="w-full py-2.5 px-4 rounded border-2 border-[#5C7A50] text-[#5C7A50] hover:bg-[#5C7A50]/10 font-sans font-bold text-xs tracking-wide transition-all shadow-sm flex items-center justify-center gap-2 text-center"
+                  >
+                    <span>Create Business Account →</span>
                   </Link>
                 </div>
               )}

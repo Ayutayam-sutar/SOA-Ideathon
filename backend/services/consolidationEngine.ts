@@ -111,14 +111,17 @@ export const consolidationEngine = {
     const assignedIds = new Set(assignedRows.map(r => r.shipmentId));
 
     const allShipments = await db.select().from(shipments);
-    const unassigned = allShipments.filter(s => !assignedIds.has(s.id));
+    // Only approved shipments should be eligible for clustering
+    const approvedShipments = allShipments.filter(s => s.status === 'approved');
+    const unassigned = approvedShipments.filter(s => !assignedIds.has(s.id));
 
     const activeVehicles = await db.select().from(vehicles);
     const activeHubs = await db.select().from(hubs);
 
     const clusters: any[] = [];
-    const pool = unassigned.length > 0 ? [...unassigned] : [...allShipments];
-    const maxGlobalCapacity = activeVehicles.length > 0 ? Math.max(...activeVehicles.map(v => v.capacityKg)) : 25000;
+    // Business rule: maximum 8000 kg per cluster — a new cluster must be created once this is reached
+    const maxGlobalCapacity = 8000;
+    const pool = unassigned.length > 0 ? [...unassigned] : [...approvedShipments];
 
     while (pool.length > 0) {
       const base = pool.shift()!;
@@ -520,8 +523,8 @@ export const consolidationEngine = {
     const activeVehicles = await db.select().from(vehicles);
     const activeHubs = await db.select().from(hubs);
     
-    // FIX 2: Hardcode a heavy capacity (25 Tons) so heavy multi-shipment consolidation is guaranteed
-    const maxGlobalCapacity = 25000; 
+    // Business rule: maximum 8000 kg per cluster
+    const maxGlobalCapacity = 8000; 
 
     const targetOriginLoc = resolveLocation(targetShipment.origin, activeHubs);
     const targetDestLoc = resolveLocation(targetShipment.destination, activeHubs);

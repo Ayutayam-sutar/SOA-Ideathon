@@ -2,14 +2,14 @@
  * routeCompletionService.ts
  *
  * GPS-ready abstraction for completing a delivery route.
- * Currently triggered manually via the "Finish Delivery" button.
+ * Triggered manually via the "Finish Delivery" button.
  * Structured so a future GPS webhook can call updateRouteStatus()
  * directly when the truck breaches the destination geofence.
  */
 
 import { db } from '../db';
 import { deliveryRoutes, clusterShipments, shipments, consolidationClusters } from '../db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, like } from 'drizzle-orm';
 
 export interface RouteCompletionResult {
   routeId: string;
@@ -24,14 +24,17 @@ export interface RouteCompletionResult {
  * Marks a route as COMPLETED and cascades the status change to all
  * consolidated shipments within it (IN_TRANSIT → DELIVERED).
  *
- * @param routeId   - The delivery route ID
- * @param lat       - Optional GPS latitude (for future geofence triggers)
- * @param lng       - Optional GPS longitude (for future geofence triggers)
+ * @param routeId          - The delivery route ID
+ * @param lat              - Optional GPS latitude
+ * @param lng              - Optional GPS longitude
+ * @param vehicleDisplayStr - Human-readable vehicle string (e.g. "OD-07-H-8821 (Ashok Leyland 16T)")
+ *                           used to match shipments.assignedVehicle when clusterId is stale/missing
  */
 export async function updateRouteStatus(
   routeId: string,
   lat?: number,
-  lng?: number
+  lng?: number,
+  vehicleDisplayStr?: string
 ): Promise<RouteCompletionResult> {
   // 1. Validate route exists
   const routeRows = await db.select().from(deliveryRoutes).where(eq(deliveryRoutes.id, routeId)).limit(1);
@@ -40,18 +43,6 @@ export async function updateRouteStatus(
   }
 
   const route = routeRows[0];
-  if (route.status === 'completed') {
-    // Idempotent: already completed — return without error
-    return {
-      routeId,
-      status: 'completed',
-      deliveredShipmentIds: [],
-      lat,
-      lng,
-      completedAt: new Date().toISOString(),
-    };
-  }
-
   // 2. Mark the route itself as completed
   await db
     .update(deliveryRoutes)
@@ -86,6 +77,53 @@ export async function updateRouteStatus(
       .update(consolidationClusters)
       .set({ status: 'delivered' })
       .where(eq(consolidationClusters.id, route.clusterId));
+  }
+
+
+  // 6. Vehicle fallback: match shipments by assignedVehicle plate prefix
+  //    Covers the case where dispatch set shipments.assignedVehicle but didn't update the route's clusterId.
+  //    vehicleDisplayStr is passed from completeRoute controller and contains the real OD-XX plate string.
+  const vehicleStr = vehicleDisplayStr || '';
+  const platePrefix = vehicleStr.split(' ')[0]; // e.g. "OD-07-H-8821"
+
+  if (platePrefix && platePrefix.startsWith('OD-')) {
+    const vehicleRows = await db
+      .select({ id: shipments.id, clusterId: clusterShipments.clusterId })
+      .from(shipments)
+      .leftJoin(clusterShipments, eq(clusterShipments.shipmentId, shipments.id))
+      .where(like(shipments.assignedVehicle, `${platePrefix}%`));
+
+    const vehicleShipmentIds = vehicleRows
+      .map(s => s.id)
+      .filter(id => !deliveredShipmentIds.includes(id));
+
+    if (vehicleShipmentIds.length > 0) {
+      await db
+        .update(shipments)
+        .set({ status: 'delivered' })
+        .where(inArray(shipments.id, vehicleShipmentIds));
+
+      deliveredShipmentIds = [...deliveredShipmentIds, ...vehicleShipmentIds];
+      console.log(`[RouteCompletion] ${vehicleShipmentIds.length} shipments DELIVERED via vehicle fallback (${platePrefix}).`);
+    }
+  }
+
+  // 7. Universal cluster cascade: Mark all clusters containing ANY delivered shipment as 'delivered'
+  if (deliveredShipmentIds.length > 0) {
+    const parentClusters = await db
+      .select({ clusterId: clusterShipments.clusterId })
+      .from(clusterShipments)
+      .where(inArray(clusterShipments.shipmentId, deliveredShipmentIds));
+
+    const uniqueClusterIds = [...new Set(parentClusters.map((c) => c.clusterId))];
+    if (uniqueClusterIds.length > 0) {
+      await db
+        .update(consolidationClusters)
+        .set({ status: 'delivered' })
+        .where(inArray(consolidationClusters.id, uniqueClusterIds));
+
+      console.log(`[RouteCompletion] ${uniqueClusterIds.length} cluster(s) marked DELIVERED via parent shipment cascade:`, uniqueClusterIds);
+    }
   }
 
   return {

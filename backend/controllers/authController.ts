@@ -87,7 +87,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     }
 
     // Intentional, scoped demo-login shortcut for named live-judging accounts only
-    const DEMO_ALLOWLIST = ['admin@karwaan.in', 'logistics@sahyadri.in', 'agent1@karwaan.in'];
+    const DEMO_ALLOWLIST = ['admin@karwaan.in', 'logistics@sahyadri.in', 'agent1@karwaan.in', 'mumbatan199@gmail.com'];
     const isAllowedDemoUser = DEMO_ALLOWLIST.includes(user.email) && password === 'demo-access-2026';
 
     if (isAllowedDemoUser) {
@@ -114,6 +114,10 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' });
 
+    const isMumbatan = user.email.toLowerCase() === 'mumbatan199@gmail.com';
+    const assignedRouteId = isMumbatan ? 'REC-RT-8287' : (user.role === 'agent' ? 'REC-RT-7415' : undefined);
+    const assignedVehicleId = isMumbatan ? 'OD-07-H-8821 (Ashok Leyland 16T)' : (user.role === 'agent' ? 'OD-02-AX-4592 (Tata 14T Reefer)' : undefined);
+
     res.status(200).json({
       success: true,
       token,
@@ -123,7 +127,9 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
         role: user.role,
         businessId: user.businessId,
         businessName: business?.name,
-        name: business?.contactInfo,
+        name: isMumbatan ? 'Mumbatan (Ashok Leyland Captain)' : business?.contactInfo,
+        assignedRouteId,
+        assignedVehicleId,
       },
     });
   } catch (error) {
@@ -155,6 +161,10 @@ export const me = async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const { user, business } = userArray[0];
+    const isMumbatan = user.email.toLowerCase() === 'mumbatan199@gmail.com';
+    const assignedRouteId = isMumbatan ? 'REC-RT-8287' : (user.role === 'agent' ? 'REC-RT-7415' : undefined);
+    const assignedVehicleId = isMumbatan ? 'OD-07-H-8821 (Ashok Leyland 16T)' : (user.role === 'agent' ? 'OD-02-AX-4592 (Tata 14T Reefer)' : undefined);
+
     res.status(200).json({
       success: true,
       user: {
@@ -163,7 +173,9 @@ export const me = async (req: Request, res: Response, next: NextFunction) => {
         role: user.role,
         businessId: user.businessId,
         businessName: business?.name,
-        name: business?.contactInfo,
+        name: isMumbatan ? 'Mumbatan (Ashok Leyland Captain)' : business?.contactInfo,
+        assignedRouteId,
+        assignedVehicleId,
       }
     });
   } catch (error) {

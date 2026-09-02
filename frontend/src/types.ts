@@ -8,6 +8,7 @@ export interface User {
   businessId?: string;
   businessName?: string;
   assignedRouteId?: string;
+  assignedVehicleId?: string;
   avatarUrl?: string;
   title: string;
 }
@@ -171,7 +172,7 @@ export interface ConsolidationCluster {
   cargoCategories: PerishableCategory[];
   tempBand: string; // e.g. "2°C to 5°C (Chilled Fruits/Dairy)"
   assignedRouteId: string;
-  status: 'assembling' | 'in_transit' | 'disrupted' | 'completed';
+  status: 'assembling' | 'scheduled' | 'in_transit' | 'dispatched' | 'disrupted' | 'completed' | 'delivered';
   costSavingsPercent: number;
   co2SavedKg: number;
   reeferLoadFactorPercent: number;

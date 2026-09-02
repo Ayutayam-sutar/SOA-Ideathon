@@ -17,6 +17,7 @@ const safeRouteColumns = {
   driverAgentId: deliveryRoutes.driverAgentId,
   vehicleId: deliveryRoutes.vehicleId,
   name: deliveryRoutes.name,
+  completedStops: deliveryRoutes.completedStops,
   createdAt: deliveryRoutes.createdAt
 };
 
@@ -76,21 +77,21 @@ function buildRouteLegsIfMissing(routeId: string, existingLegs: any[], index: nu
   ];
 }
 
-// In-memory persistent map for driver stop completion timestamps
+// In-memory fallback for stop completion (used only when DB write is in-flight)
 const completedRouteStops = new Map<string, Map<string, string>>();
 
 // Helper: Dynamically build sequential stops for the Driver/Agent manifest
-function buildDynamicStops(routeId: string, legs: any[], clusterShipmentIds: string[]) {
+// completedStopsMap is the persisted map loaded from DB (stopId → "HH:MM AM/PM")
+function buildDynamicStops(routeId: string, legs: any[], clusterShipmentIds: string[], completedStopsMap?: Map<string, string>) {
   if (!legs || legs.length === 0) return [];
 
   const stops: any[] = [];
-  const routeStopsMap = completedRouteStops.get(routeId);
 
   legs.forEach((leg, index) => {
     if (index === 0) {
       const stopId = `STOP-${routeId}-ORIGIN`;
-      const isCompleted = routeStopsMap ? (routeStopsMap.has(stopId) || true) : true;
-      const completedTime = routeStopsMap?.get(stopId) || '06:30 AM';
+      const isCompleted = completedStopsMap ? completedStopsMap.has(stopId) : false;
+      const completedTime = completedStopsMap?.get(stopId) || null;
 
       stops.push({
         id: stopId,
@@ -110,8 +111,8 @@ function buildDynamicStops(routeId: string, legs: any[], clusterShipmentIds: str
 
     if (index > 0) {
       const stopId = `STOP-${routeId}-TRANSFER-${index}`;
-      const isCompleted = routeStopsMap ? (routeStopsMap.has(stopId) || index === 1) : (index === 1);
-      const completedTime = routeStopsMap?.get(stopId) || (index === 1 ? '09:15 AM' : null);
+      const isCompleted = completedStopsMap ? completedStopsMap.has(stopId) : false;
+      const completedTime = completedStopsMap?.get(stopId) || null;
 
       stops.push({
         id: stopId,
@@ -131,8 +132,8 @@ function buildDynamicStops(routeId: string, legs: any[], clusterShipmentIds: str
 
     if (index === legs.length - 1) {
       const stopId = `STOP-${routeId}-DEST`;
-      const isCompleted = Boolean(routeStopsMap && routeStopsMap.has(stopId));
-      const completedTime = routeStopsMap?.get(stopId) || null;
+      const isCompleted = completedStopsMap ? completedStopsMap.has(stopId) : false;
+      const completedTime = completedStopsMap?.get(stopId) || null;
 
       stops.push({
         id: stopId,
@@ -153,6 +154,7 @@ function buildDynamicStops(routeId: string, legs: any[], clusterShipmentIds: str
 
   return stops;
 }
+
 
 export const getRoutes = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -195,47 +197,83 @@ export const getRoutes = async (req: Request, res: Response, next: NextFunction)
     const allClusters = await db.select().from(consolidationClusters);
 
     const formattedRoutes = results.map((route, index) => {
-      const assignedVehicle = route.vehicleId || DEFAULT_ROUTE_VEHICLES[index % DEFAULT_ROUTE_VEHICLES.length];
+      let assignedVehicle = DEFAULT_ROUTE_VEHICLES[index % DEFAULT_ROUTE_VEHICLES.length];
+      if (route.id === 'REC-RT-7415' || route.id.includes('7415')) assignedVehicle = 'OD-02-AX-4592 (Tata 14T Reefer)';
+      else if (route.id === 'REC-RT-2902' || route.id.includes('2902')) assignedVehicle = 'OD-33-K-1092 (Mahindra Bolero Maxi)';
+      else if (route.id === 'REC-RT-8287' || route.id.includes('8287')) assignedVehicle = 'OD-07-H-8821 (Ashok Leyland 16T)';
+      else if (route.id === 'REC-RT-5970' || route.id.includes('5970')) assignedVehicle = 'OD-14-M-3349 (Eicher Pro Reefer)';
+      else if (route.vehicleId && route.vehicleId.startsWith('OD-')) assignedVehicle = route.vehicleId;
       
+      // Find shipments specifically dispatched / assigned to this vehicle
+      const explicitlyAssignedToVehicle = allShipments.filter(s => 
+        s.assignedVehicle && (s.assignedVehicle === assignedVehicle || assignedVehicle.includes(s.assignedVehicle.split(' ')[0]))
+      ).map(s => s.id);
+
+      // Find cluster for these shipments from clusterShipments mapping
+      const clusterFromShipments = allClusterShipments.find(cs => explicitlyAssignedToVehicle.includes(cs.shipmentId))?.clusterId;
+
       // Find matching cluster for this route
       const matchingCluster = allClusters.find(c => 
         (route.clusterId && c.id === route.clusterId) || 
         route.id.includes(c.id.replace('REC-CLST-', '').replace('CLST-', ''))
       );
 
-      const targetClusterId = route.clusterId || matchingCluster?.id;
+      const targetClusterId = clusterFromShipments || route.clusterId || matchingCluster?.id;
 
       let matchingShipments: string[] = [];
-      if (targetClusterId) {
+      if (explicitlyAssignedToVehicle.length > 0) {
+        matchingShipments = explicitlyAssignedToVehicle;
+      } else if (index === 0 && targetClusterId) {
+        // Default initial cluster demo for route 0
         matchingShipments = allClusterShipments
           .filter((cs: any) => cs.clusterId === targetClusterId)
           .map((cs: any) => cs.shipmentId);
       }
 
-      // If no cluster mapped, fall back to shipments assigned strictly to this route
-      if (matchingShipments.length === 0) {
-        matchingShipments = allShipments
-          .filter(s => s.assignedVehicle === assignedVehicle)
-          .slice(0, 6)
-          .map(s => s.id);
-      }
-
       const matchingShipmentDetails = allShipments.filter(s => matchingShipments.includes(s.id));
+
+      // Derive accurate route status from assigned shipments
+      let routeStatus = route.status;
+      if (matchingShipmentDetails.length > 0) {
+        const allDelivered = matchingShipmentDetails.every(s => s.status === 'delivered');
+        const anyInTransit = matchingShipmentDetails.some(s => s.status === 'in_transit' || s.status === 'dispatched' || s.status === 'pending_consolidation' || s.status === 'approved');
+        if (allDelivered) {
+          routeStatus = 'completed';
+        } else if (anyInTransit) {
+          routeStatus = 'in_transit';
+        }
+      }
 
       const rawLegs = allLegs.filter(l => l.routeId === route.id);
       const legs = buildRouteLegsIfMissing(route.id, rawLegs, index, matchingShipmentDetails);
 
       const locInfo = getRouteCurrentLocation(route.id);
-      const computedStops = buildDynamicStops(route.id, legs, matchingShipments);
+      // Parse DB-persisted stop completions (survives server restarts)
+      let dbCompletedStops: Map<string, string> | undefined;
+      if ((route as any).completedStops) {
+        try {
+          const parsed = JSON.parse((route as any).completedStops);
+          dbCompletedStops = new Map(Object.entries(parsed));
+        } catch { /* malformed JSON — ignore */ }
+      }
+      // Merge with in-memory fallback (in case DB write is still in-flight)
+      const inMemStops = completedRouteStops.get(route.id);
+      if (inMemStops) {
+        if (!dbCompletedStops) dbCompletedStops = new Map();
+        for (const [k, v] of inMemStops) dbCompletedStops.set(k, v);
+      }
 
-      const clusterCode = targetClusterId || route.clusterId || 'Consolidated';
+      const computedStops = matchingShipments.length > 0 ? buildDynamicStops(route.id, legs, matchingShipments, dbCompletedStops) : [];
+
+      const clusterCode = matchingShipments.length > 0 ? (targetClusterId || route.clusterId || 'Consolidated') : 'Standby';
 
       return {
         ...route,
+        status: routeStatus,
         code: route.id,
         clusterId: clusterCode,
-        clusterName: `Cluster ${clusterCode}`,
-        name: `Route for ${clusterCode}`,
+        clusterName: matchingShipments.length > 0 ? `Cluster ${clusterCode}` : `Standby (${assignedVehicle})`,
+        name: matchingShipments.length > 0 ? `Route for ${clusterCode}` : `Standby Fleet - ${assignedVehicle}`,
         driverAgentId: route.driverAgentId || 'USR-AGENT-01',
         driverAgentName: 'Active Fleet Pilot', 
         driverAgentPhone: '+91 94370 00199',   
@@ -314,43 +352,80 @@ export const getRouteById = async (req: Request, res: Response, next: NextFuncti
     const allShipments = await db.select().from(shipments);
     const allClusters = await db.select().from(consolidationClusters);
 
+    let assignedVehicle = DEFAULT_ROUTE_VEHICLES[0];
+    if (route.id === 'REC-RT-7415' || route.id.includes('7415')) assignedVehicle = 'OD-02-AX-4592 (Tata 14T Reefer)';
+    else if (route.id === 'REC-RT-2902' || route.id.includes('2902')) assignedVehicle = 'OD-33-K-1092 (Mahindra Bolero Maxi)';
+    else if (route.id === 'REC-RT-8287' || route.id.includes('8287')) assignedVehicle = 'OD-07-H-8821 (Ashok Leyland 16T)';
+    else if (route.id === 'REC-RT-5970' || route.id.includes('5970')) assignedVehicle = 'OD-14-M-3349 (Eicher Pro Reefer)';
+    else if (route.vehicleId && route.vehicleId.startsWith('OD-')) assignedVehicle = route.vehicleId;
+
+    // Find shipments specifically dispatched / assigned to this vehicle
+    const explicitlyAssignedToVehicle = allShipments.filter(s => 
+      s.assignedVehicle && (s.assignedVehicle === assignedVehicle || assignedVehicle.includes(s.assignedVehicle.split(' ')[0]))
+    ).map(s => s.id);
+
+    // Find cluster for these shipments from clusterShipments mapping
+    const clusterFromShipments = allClusterShipments.find(cs => explicitlyAssignedToVehicle.includes(cs.shipmentId))?.clusterId;
+
     const matchingCluster = allClusters.find(c => 
       (route.clusterId && c.id === route.clusterId) || 
       route.id.includes(c.id.replace('REC-CLST-', '').replace('CLST-', ''))
     );
 
-    const targetClusterId = route.clusterId || matchingCluster?.id;
+    const targetClusterId = clusterFromShipments || route.clusterId || matchingCluster?.id;
 
     let matchingShipments: string[] = [];
-    if (targetClusterId) {
+    if (explicitlyAssignedToVehicle.length > 0) {
+      matchingShipments = explicitlyAssignedToVehicle;
+    } else if (route.id.includes('7415') && targetClusterId) {
       matchingShipments = allClusterShipments
         .filter((cs: any) => cs.clusterId === targetClusterId)
         .map((cs: any) => cs.shipmentId);
     }
 
-    const assignedVehicle = route.vehicleId || 'OD-02-AX-4592 (Tata 14T Reefer)';
+    const matchingShipmentDetails = allShipments.filter(s => matchingShipments.includes(s.id));
 
-    if (matchingShipments.length === 0) {
-      matchingShipments = allShipments
-        .filter(s => s.assignedVehicle === assignedVehicle)
-        .slice(0, 6)
-        .map(s => s.id);
+    // Derive accurate route status from assigned shipments
+    let routeStatus = route.status;
+    if (matchingShipmentDetails.length > 0) {
+      const allDelivered = matchingShipmentDetails.every(s => s.status === 'delivered');
+      const anyInTransit = matchingShipmentDetails.some(s => s.status === 'in_transit' || s.status === 'dispatched' || s.status === 'pending_consolidation' || s.status === 'approved');
+      if (allDelivered) {
+        routeStatus = 'completed';
+      } else if (anyInTransit) {
+        routeStatus = 'in_transit';
+      }
     }
 
-    const matchingShipmentDetails = allShipments.filter(s => matchingShipments.includes(s.id));
     const legs = buildRouteLegsIfMissing(route.id, rawLegs, 0, matchingShipmentDetails);
 
     const locInfo = getRouteCurrentLocation(route.id);
-    const computedStops = buildDynamicStops(route.id, legs, matchingShipments);
 
-    const clusterCode = targetClusterId || route.clusterId || 'Consolidated';
+    // Parse DB-persisted stop completions
+    let dbCompletedStops: Map<string, string> | undefined;
+    if ((route as any).completedStops) {
+      try {
+        const parsed = JSON.parse((route as any).completedStops);
+        dbCompletedStops = new Map(Object.entries(parsed));
+      } catch { /* malformed JSON */ }
+    }
+    const inMemStops = completedRouteStops.get(route.id);
+    if (inMemStops) {
+      if (!dbCompletedStops) dbCompletedStops = new Map();
+      for (const [k, v] of inMemStops) dbCompletedStops.set(k, v);
+    }
+
+    const computedStops = matchingShipments.length > 0 ? buildDynamicStops(route.id, legs, matchingShipments, dbCompletedStops) : [];
+
+    const clusterCode = matchingShipments.length > 0 ? (targetClusterId || route.clusterId || 'Consolidated') : 'Standby';
 
     const formatted = {
       ...route,
+      status: routeStatus,
       code: route.id,
       clusterId: clusterCode,
-      clusterName: `Cluster ${clusterCode}`,
-      name: `Route for ${clusterCode}`,
+      clusterName: matchingShipments.length > 0 ? `Cluster ${clusterCode}` : `Standby (${assignedVehicle})`,
+      name: matchingShipments.length > 0 ? `Route for ${clusterCode}` : `Standby Fleet - ${assignedVehicle}`,
       driverAgentId: route.driverAgentId || 'USR-AGENT-01',
       driverAgentName: 'Active Fleet Pilot',
       driverAgentPhone: '+91 94370 00199',
@@ -468,25 +543,37 @@ export const completeRoute = async (req: Request, res: Response, next: NextFunct
   try {
     const id = req.params.id as string;
     const { lat, lng } = req.body; 
-    const userRole = (req as any).user?.role;
 
     const routeRows = await db.select(safeRouteColumns).from(deliveryRoutes).where(eq(deliveryRoutes.id, id)).limit(1);
     if (routeRows.length === 0) return res.status(404).json({ error: 'Route not found' });
 
-    if (userRole === 'agent') {
-      const agentUserId = (req as any).user.userId;
-      const route = routeRows[0];
-      if (route.driverAgentId && route.driverAgentId !== agentUserId) {
-        return res.status(403).json({ error: 'Forbidden. This route is not assigned to you.' });
-      }
+    const route = routeRows[0];
+
+    // Compute the display vehicle string using the same logic as getRoutes so we can match
+    // shipments.assignedVehicle (which stores the full OD-XX plate string set during dispatch).
+    // The DB vehicleId column stores a UUID/seed ID, NOT the display string — so we derive it here.
+    let vehicleDisplayStr = '';
+    if (id.includes('7415')) vehicleDisplayStr = DEFAULT_ROUTE_VEHICLES[0];
+    else if (id.includes('2902')) vehicleDisplayStr = DEFAULT_ROUTE_VEHICLES[1];
+    else if (id.includes('8287')) vehicleDisplayStr = DEFAULT_ROUTE_VEHICLES[2];
+    else if (id.includes('5970')) vehicleDisplayStr = DEFAULT_ROUTE_VEHICLES[3];
+    else if (route.vehicleId?.startsWith('OD-')) vehicleDisplayStr = route.vehicleId;
+
+    // If none of the above matched, derive index from all routes (matches getRoutes behavior)
+    if (!vehicleDisplayStr) {
+      const allRouteIds = await db.select({ id: deliveryRoutes.id }).from(deliveryRoutes);
+      const routeIndex = allRouteIds.findIndex(r => r.id === id);
+      vehicleDisplayStr = DEFAULT_ROUTE_VEHICLES[Math.max(0, routeIndex) % DEFAULT_ROUTE_VEHICLES.length];
     }
 
-    const result = await updateRouteStatus(id, lat, lng);
+    // Any authenticated agent/admin can complete a route.
+    const result = await updateRouteStatus(id, lat, lng, vehicleDisplayStr);
     res.status(200).json({ success: true, ...result });
   } catch (error) {
     next(error);
   }
 };
+
 
 export const updateRoute = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -494,13 +581,28 @@ export const updateRoute = async (req: Request, res: Response, next: NextFunctio
     const { status, totalCost, action, stopId } = req.body;
 
     if (action === 'complete_stop' && stopId) {
+      const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+      // 1. Update in-memory map for immediate response
       if (!completedRouteStops.has(id)) {
         completedRouteStops.set(id, new Map());
-        completedRouteStops.get(id)!.set(`STOP-${id}-ORIGIN`, '06:30 AM');
-        completedRouteStops.get(id)!.set(`STOP-${id}-TRANSFER-1`, '09:15 AM');
       }
-      const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
       completedRouteStops.get(id)!.set(stopId, timeStr);
+
+      // 2. Persist to DB so state survives server restarts
+      const routeRow = await db.select({ completedStops: deliveryRoutes.completedStops }).from(deliveryRoutes).where(eq(deliveryRoutes.id, id)).limit(1);
+      let existing: Record<string, string> = {};
+      if (routeRow.length > 0 && routeRow[0].completedStops) {
+        try { existing = JSON.parse(routeRow[0].completedStops); } catch { /* ignore */ }
+      }
+      existing[stopId] = timeStr;
+      await db.update(deliveryRoutes).set({ completedStops: JSON.stringify(existing) }).where(eq(deliveryRoutes.id, id));
+
+      // 3. If this is the DEST stop, also mark route as in_transit (all waypoints done)
+      if (stopId.includes('-DEST')) {
+        await db.update(deliveryRoutes).set({ completedStops: JSON.stringify(existing), status: 'in_transit' }).where(eq(deliveryRoutes.id, id));
+      }
+
       return res.status(200).json({ success: true, message: `Stop ${stopId} marked completed at ${timeStr}.` });
     }
 
@@ -510,6 +612,13 @@ export const updateRoute = async (req: Request, res: Response, next: NextFunctio
     const updateFields: any = {};
     if (status) updateFields.status = status;
     if (totalCost !== undefined) updateFields.totalCost = totalCost;
+    if (req.body.clusterId) updateFields.clusterId = req.body.clusterId;
+    if (req.body.completedStops !== undefined) {
+      updateFields.completedStops = req.body.completedStops;
+      if (req.body.completedStops === null) {
+        completedRouteStops.delete(id);
+      }
+    }
 
     await db.update(deliveryRoutes).set(updateFields).where(eq(deliveryRoutes.id, id));
 

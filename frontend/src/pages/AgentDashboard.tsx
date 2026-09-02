@@ -26,16 +26,22 @@ export const AgentDashboard: React.FC = () => {
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isFinishing, setIsFinishing] = useState(false);
-  const [isRouteCompleted, setIsRouteCompleted] = useState(false);
 
   const [completedStopIds, setCompletedStopIds] = useState<Set<string>>(new Set());
 
-  const myRouteId = user?.assignedRouteId;
+  const isMumbatan = user?.email?.toLowerCase() === 'mumbatan199@gmail.com';
+
   const myRoute =
-    (myRouteId && routes.find((r) => r.id === myRouteId)) ||
+    (user?.assignedRouteId && routes.find((r) => r.id === user.assignedRouteId || r.code === user.assignedRouteId)) ||
+    (user?.assignedVehicleId && routes.find((r) => r.vehicleId?.includes(user.assignedVehicleId?.split(' ')[0] || ''))) ||
+    (isMumbatan && routes.find((r) => r.vehicleId?.includes('OD-07-H-8821') || r.id.includes('8287'))) ||
+    (user?.assignedRouteId && routes.find((r) => r.id === user.assignedRouteId)) ||
     routes.find((r) => r.status !== 'completed' && r.status !== 'scheduled') ||
     routes.find((r) => r.status !== 'completed') ||
     routes[0];
+
+  // Use DB status as source of truth — survives page refreshes
+  const isRouteCompleted = myRoute?.status === 'completed';
 
   useEffect(() => {
     const loadData = async () => {
@@ -89,7 +95,7 @@ export const AgentDashboard: React.FC = () => {
     setIsFinishing(true);
     try {
       await dataService.completeRoute(myRoute.id);
-      setIsRouteCompleted(true);
+      // Refresh from DB — myRoute.status will now be 'completed', hiding the button
       const [r, s] = await Promise.all([dataService.getRoutes(), dataService.getShipments()]);
       setRoutes(r);
       setShipments(s);
@@ -101,6 +107,7 @@ export const AgentDashboard: React.FC = () => {
   };
 
   const handleLogout = () => {
+
     localStorage.removeItem('karwaan_token');
     window.location.href = '/';
   };
@@ -170,7 +177,7 @@ export const AgentDashboard: React.FC = () => {
               </span>
               <span className="text-white/80 text-sm font-medium flex items-center gap-1.5 bg-white/10 px-2.5 py-1 rounded-md">
                 <Truck className="w-4 h-4"/> 
-                {myRoute.vehicleId ? myRoute.vehicleId.split('(')[0] : 'Unknown Vehicle'}
+                {myRoute.vehicleId || 'Unknown Vehicle'}
               </span>
             </div>
             <h1 className="font-display font-black text-3xl sm:text-4xl tracking-tight">{myRoute.name}</h1>
@@ -262,12 +269,12 @@ export const AgentDashboard: React.FC = () => {
             {(!myRoute.stops || myRoute.stops.length === 0) ? (
               <div className="bg-white border border-[#E5EBE3] border-dashed rounded-3xl p-12 text-center shadow-sm flex flex-col items-center justify-center h-[400px]">
                 <div className="bg-[#F8FAF7] p-5 rounded-full mb-4">
-                  <PackageOpen className="w-12 h-12 text-[#5C7A50]" />
+                  <PackageOpen className="w-12 h-12 text-[#D98E2B]" />
                 </div>
-                <h3 className="font-display font-bold text-xl text-[#163832] mb-2">No Stops Assigned Yet</h3>
-                <p className="text-[#596560] max-w-sm mx-auto text-sm">
-                  The consolidation engine has created the route wrapper, but stops have not been successfully injected into the manifest. 
-                  Waiting for dispatch...
+                <h3 className="font-display font-bold text-xl text-[#163832] mb-2">Fleet on Standby (0 Consignments)</h3>
+                <p className="text-[#596560] max-w-md mx-auto text-sm leading-relaxed">
+                  No orders have been dispatched to <span className="font-bold text-[#163832] font-mono">{myRoute.vehicleId || 'this fleet'}</span> yet. 
+                  Once the Admin consolidates shipments and dispatches them to this vehicle, the manifest will appear here automatically.
                 </p>
               </div>
             ) : (
