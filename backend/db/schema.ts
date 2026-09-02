@@ -107,8 +107,11 @@ export const deliveryRoutes = pgTable('delivery_routes', {
   driverAgentPhone: text('driver_agent_phone'),
   vehicleId: varchar('vehicle_id', { length: 255 }),
   name: text('name'),
+  // Persisted stop completion state — JSON map of { stopId: "HH:MM AM/PM" }
+  completedStops: text('completed_stops'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
 
 
 export const routeLegs = pgTable('route_legs', {

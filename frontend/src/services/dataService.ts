@@ -167,6 +167,15 @@ class DataService {
     }
   }
 
+  public async updateClusterStatus(clusterId: string, status: string): Promise<void> {
+    await apiClient.patch(`/clusters/${clusterId}`, { status });
+  }
+
+  public async linkRouteToCluster(routeId: string, clusterId: string): Promise<void> {
+    // Updates the delivery_routes.clusterId so completeRoute cascade works correctly
+    await apiClient.patch(`/routes/${routeId}`, { clusterId, status: 'in_transit', completedStops: null });
+  }
+
   public async getRoutes(): Promise<DeliveryRoute[]> {
     const res = await apiClient.get('/routes');
     return Array.isArray(res) ? res : res.routes || [];

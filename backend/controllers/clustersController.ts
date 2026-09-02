@@ -45,7 +45,12 @@ export const getClusters = async (req: Request, res: Response, next: NextFunctio
     // 4. Dynamically Calculate Real Cluster Data
     const formattedClusters = results.map((cluster) => {
       const clusterShipmentIds = allMappings.filter(m => m.clusterId === cluster.id).map(m => m.shipmentId);
-      const clusterShipmentDetails = allShipments.filter(s => clusterShipmentIds.includes(s.id));
+      // Only count shipments that are approved or beyond (consolidated, in_transit, delivered)
+      // Unapproved (pending/draft/rejected) orders must not contribute to cluster metrics
+      const approvedStatuses = ['approved', 'pending_consolidation', 'consolidated', 'in_transit', 'delivered'];
+      const clusterShipmentDetails = allShipments.filter(
+        s => clusterShipmentIds.includes(s.id) && approvedStatuses.includes(s.status)
+      );
       
       const defaultHubs = getClusterHubs(cluster.id);
       const originName = clusterShipmentDetails[0]?.origin || defaultHubs.originHub.name;
@@ -77,13 +82,19 @@ export const getClusters = async (req: Request, res: Response, next: NextFunctio
       const minTemp = clusterShipmentDetails.length > 0 ? Math.max(...clusterShipmentDetails.map(s => s.targetTempMin != null ? s.targetTempMin : 2)) : 2;
       const maxTemp = clusterShipmentDetails.length > 0 ? Math.min(...clusterShipmentDetails.map(s => s.targetTempMax != null ? s.targetTempMax : 8)) : 8;
 
+      let clusterStatus = cluster.status;
+      if (clusterShipmentDetails.length > 0 && clusterShipmentDetails.every(s => s.status === 'delivered')) {
+        clusterStatus = 'delivered';
+      }
+
       return {
         ...cluster,
+        status: clusterStatus,
         code: cluster.id,
         name: `Cluster ${cluster.id}`,
         originHub,
         destinationHub,
-        shipmentIds: clusterShipmentIds,
+        shipmentIds: clusterShipmentDetails.map(s => s.id),
         totalWeightKg,
         maxCapacityKg: 8000, 
         cargoCategories,
@@ -153,8 +164,14 @@ export const getClusterById = async (req: Request, res: Response, next: NextFunc
     const minTemp = clusterShipmentDetails.length > 0 ? Math.max(...clusterShipmentDetails.map(s => s.targetTempMin != null ? s.targetTempMin : 2)) : 2;
     const maxTemp = clusterShipmentDetails.length > 0 ? Math.min(...clusterShipmentDetails.map(s => s.targetTempMax != null ? s.targetTempMax : 8)) : 8;
 
+    let clusterStatus = cluster.status;
+    if (clusterShipmentDetails.length > 0 && clusterShipmentDetails.every(s => s.status === 'delivered')) {
+      clusterStatus = 'delivered';
+    }
+
     const formatted = {
       ...cluster,
+      status: clusterStatus,
       code: cluster.id,
       name: `Cluster ${cluster.id}`,
       originHub,

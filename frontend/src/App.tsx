@@ -33,6 +33,7 @@ export default function App() {
           element={<Navigate to="/select-role" replace />}
         />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/register/:role" element={<RegisterPage />} />
 
         {/* ================= ADMIN ================= */}
         <Route path="/admin" element={<AdminLayout />}>
