@@ -413,20 +413,20 @@ export const consolidationEngine = {
 
     console.log(`\n--- Scoring Candidates for ${originLoc.name} -> ${destLoc.name} (Distance: ${Math.round(distanceKm)}km) ---`);
 
-    await Promise.all(candidates.map(async (cand) => {
-      if (cand.durationHours > maxDeliveryHours) {
-        cand.slaStatus = 'violated';
-        cand.score = Infinity;
-        allScoredCandidates.push(cand);
-        return;
-      }
+const candidatesToScore = candidates.filter(c => c.durationHours <= maxDeliveryHours);
+    const violatedCandidates = candidates.filter(c => c.durationHours > maxDeliveryHours);
+    
+    violatedCandidates.forEach(cand => {
+      cand.slaStatus = 'violated';
+      cand.score = Infinity;
+      allScoredCandidates.push(cand);
+    });
 
-      const [delayRisk, spoilageRisk] = await Promise.all([
-        riskPredictionService.predictDelayRisk(routeId, cand.legs, repShipmentId),
-        repShipmentId 
-          ? riskPredictionService.predictSpoilageRisk(repShipmentId, cand.durationHours, cand.transfers, 0)
-          : Promise.resolve({ score: 30, level: 'medium', projectedFreshnessAtDelivery: 90, contributingFactors: [] })
-      ]);
+    // Run Python ONE time for all routes!
+    const batchRisks = await riskPredictionService.predictBatchRisk(routeId, candidatesToScore, repShipmentId);
+
+    candidatesToScore.forEach((cand, index) => {
+      const { delayRisk, spoilageRisk } = batchRisks[index];
       
       const normalizedCost = maxCost > 0 ? cand.cost / maxCost : 0;
       const normalizedDuration = maxDuration > 0 ? cand.durationHours / maxDuration : 0;
@@ -456,7 +456,7 @@ export const consolidationEngine = {
         bestDelayRisk = delayRisk;
         bestSpoilageRisk = spoilageRisk;
       }
-    }));
+    });
 
     if (!bestCandidate) {
       bestCandidate = candidates[0];
