@@ -31,14 +31,48 @@ export const AgentDashboard: React.FC = () => {
 
   const isMumbatan = user?.email?.toLowerCase() === 'mumbatan199@gmail.com';
 
-  const myRoute =
-    (user?.assignedRouteId && routes.find((r) => r.id === user.assignedRouteId || r.code === user.assignedRouteId)) ||
-    (user?.assignedVehicleId && routes.find((r) => r.vehicleId?.includes(user.assignedVehicleId?.split(' ')[0] || ''))) ||
-    (isMumbatan && routes.find((r) => r.vehicleId?.includes('OD-07-H-8821') || r.id.includes('8287'))) ||
-    (user?.assignedRouteId && routes.find((r) => r.id === user.assignedRouteId)) ||
-    routes.find((r) => r.status !== 'completed' && r.status !== 'scheduled') ||
-    routes.find((r) => r.status !== 'completed') ||
-    routes[0];
+  // Route selection priority — NEVER surface a completed route when an active one exists.
+  // Completed routes are hidden from the driver; they'll see "No Active Route" instead of
+  // a stale manifest from a prior delivery.
+  const myRoute = (() => {
+    // 1. Explicit assignment via user.assignedRouteId (non-completed only)
+    if (user?.assignedRouteId) {
+      const r = routes.find(r =>
+        (r.id === user.assignedRouteId || r.code === user.assignedRouteId) &&
+        r.status !== 'completed'
+      );
+      if (r) return r;
+    }
+
+    // 2. Explicit assignment via user.assignedVehicleId (non-completed only)
+    if (user?.assignedVehicleId) {
+      const r = routes.find(r =>
+        r.vehicleId?.includes(user.assignedVehicleId?.split(' ')[0] || '') &&
+        r.status !== 'completed'
+      );
+      if (r) return r;
+    }
+
+    // 3. Demo user: find the Ashok Leyland route — but ONLY if it's active
+    if (isMumbatan) {
+      const r = routes.find(r =>
+        (r.vehicleId?.includes('OD-07-H-8821') || r.id.includes('8287')) &&
+        r.status !== 'completed'
+      );
+      if (r) return r;
+    }
+
+    // 4. Any route currently in_transit
+    const inTransit = routes.find(r => r.status === 'in_transit');
+    if (inTransit) return inTransit;
+
+    // 5. Any scheduled (not yet started) route
+    const scheduled = routes.find(r => r.status === 'scheduled');
+    if (scheduled) return scheduled;
+
+    // 6. Nothing active — return null so "No Active Route" is shown
+    return null;
+  })();
 
   // Use DB status as source of truth — survives page refreshes
   const isRouteCompleted = myRoute?.status === 'completed';

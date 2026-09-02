@@ -30,8 +30,8 @@ export const LoginPage: React.FC = () => {
       buttonBg: 'bg-[#5C7A50] hover:bg-[#435A3A]',
       borderAccent: 'border-[#5C7A50]',
       icon: Briefcase,
-      defaultEmail: 'logistics@sahyadri.in',
-      accountName: 'Krishna Rolando (Sahyadri Agro Farms)',
+      defaultEmail: '',
+      accountName: '',
       targetRoute: '/business',
     },
     agent: {
@@ -42,8 +42,8 @@ export const LoginPage: React.FC = () => {
       buttonBg: 'bg-[#D98E2B] hover:bg-[#B5721C]',
       borderAccent: 'border-[#D98E2B]',
       icon: Navigation,
-      defaultEmail: 'agent1@karwaan.in',
-      accountName: 'Vikram Kadam (Reefer Route Captain)',
+      defaultEmail: '',
+      accountName: '',
       targetRoute: '/agent',
     },
   }[role as UserRole] || {
@@ -132,7 +132,7 @@ export const LoginPage: React.FC = () => {
 
           <div className="p-6 space-y-5">
             {/* Quick-Fill Demo Account Helper */}
-            <div className="bg-[#F8FAF7] border border-[#E5EBE3] p-3 rounded text-xs flex items-center justify-between">
+            {/*<div className="bg-[#F8FAF7] border border-[#E5EBE3] p-3 rounded text-xs flex items-center justify-between">
               <div>
                 <span className="font-mono text-[10px] uppercase font-bold text-[#596560] block">
                   Demo Credentials for {role.toUpperCase()}
@@ -146,7 +146,7 @@ export const LoginPage: React.FC = () => {
               >
                 Auto-fill
               </button>
-            </div>
+            </div> */}
 
             <form onSubmit={handleLogin} className="space-y-4 text-xs">
               {error && (

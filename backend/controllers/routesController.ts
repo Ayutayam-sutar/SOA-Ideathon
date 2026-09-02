@@ -204,42 +204,65 @@ export const getRoutes = async (req: Request, res: Response, next: NextFunction)
       else if (route.id === 'REC-RT-5970' || route.id.includes('5970')) assignedVehicle = 'OD-14-M-3349 (Eicher Pro Reefer)';
       else if (route.vehicleId && route.vehicleId.startsWith('OD-')) assignedVehicle = route.vehicleId;
       
-      // Find shipments specifically dispatched / assigned to this vehicle
-      const explicitlyAssignedToVehicle = allShipments.filter(s => 
-        s.assignedVehicle && (s.assignedVehicle === assignedVehicle || assignedVehicle.includes(s.assignedVehicle.split(' ')[0]))
-      ).map(s => s.id);
-
-      // Find cluster for these shipments from clusterShipments mapping
-      const clusterFromShipments = allClusterShipments.find(cs => explicitlyAssignedToVehicle.includes(cs.shipmentId))?.clusterId;
-
-      // Find matching cluster for this route
-      const matchingCluster = allClusters.find(c => 
-        (route.clusterId && c.id === route.clusterId) || 
-        route.id.includes(c.id.replace('REC-CLST-', '').replace('CLST-', ''))
-      );
-
-      const targetClusterId = clusterFromShipments || route.clusterId || matchingCluster?.id;
+      // SHIPMENT MATCHING — Priority order:
+      // 1. route.clusterId (most precise — set when admin dispatches a specific cluster to this route)
+      //    This prevents old delivered shipments on the same truck from bleeding into the new manifest.
+      // 2. Vehicle plate matching — only used when route has no cluster link (legacy/seeded routes)
 
       let matchingShipments: string[] = [];
-      if (explicitlyAssignedToVehicle.length > 0) {
-        matchingShipments = explicitlyAssignedToVehicle;
-      } else if (index === 0 && targetClusterId) {
-        // Default initial cluster demo for route 0
+
+      if (route.clusterId) {
+        // Priority 1: Use only the shipments belonging to the cluster currently assigned to this route.
         matchingShipments = allClusterShipments
-          .filter((cs: any) => cs.clusterId === targetClusterId)
+          .filter((cs: any) => cs.clusterId === route.clusterId)
           .map((cs: any) => cs.shipmentId);
       }
 
+      if (matchingShipments.length === 0) {
+        // Priority 2: Fall back to vehicle-plate matching for routes without a cluster link.
+        const platePrefix = assignedVehicle.split(' ')[0]; // e.g. "OD-07-H-8821"
+        matchingShipments = allShipments.filter(s =>
+          s.assignedVehicle && (
+            s.assignedVehicle === assignedVehicle ||
+            s.assignedVehicle.startsWith(platePrefix) ||
+            assignedVehicle.startsWith(s.assignedVehicle.split(' ')[0])
+          )
+        ).map(s => s.id);
+
+        // Narrow down to the most-recent cluster's shipments if we got too many
+        if (matchingShipments.length > 0) {
+          const clusterIds = [...new Set(
+            allClusterShipments.filter(cs => matchingShipments.includes(cs.shipmentId)).map(cs => cs.clusterId)
+          )];
+          // Pick the most recently created cluster to avoid stale deliveries from prior runs
+          const latestClusterId = allClusters
+            .filter(c => clusterIds.includes(c.id))
+            .sort((a, b) => new Date((b as any).createdAt || 0).getTime() - new Date((a as any).createdAt || 0).getTime())[0]?.id;
+          if (latestClusterId) {
+            matchingShipments = allClusterShipments
+              .filter(cs => cs.clusterId === latestClusterId)
+              .map(cs => cs.shipmentId);
+          }
+        }
+      }
+
+      const targetClusterId = route.clusterId || undefined;
+
       const matchingShipmentDetails = allShipments.filter(s => matchingShipments.includes(s.id));
 
-      // Derive accurate route status from assigned shipments
+      // Derive accurate route status from assigned shipments.
+      // Guard: only override to 'completed' when the route was already
+      // explicitly completed by the driver (DB status or completedStops present).
+      // Without this guard, old seeded 'delivered' shipments would make every
+      // freshly dispatched route appear completed before the driver starts.
       let routeStatus = route.status;
+      const hasDriverCompletedStops = !!((route as any).completedStops);
       if (matchingShipmentDetails.length > 0) {
         const allDelivered = matchingShipmentDetails.every(s => s.status === 'delivered');
         const anyInTransit = matchingShipmentDetails.some(s => s.status === 'in_transit' || s.status === 'dispatched' || s.status === 'pending_consolidation' || s.status === 'approved');
-        if (allDelivered) {
+        if (allDelivered && (route.status === 'completed' || hasDriverCompletedStops)) {
           routeStatus = 'completed';
-        } else if (anyInTransit) {
+        } else if (anyInTransit && route.status !== 'completed') {
           routeStatus = 'in_transit';
         }
       }
@@ -359,40 +382,58 @@ export const getRouteById = async (req: Request, res: Response, next: NextFuncti
     else if (route.id === 'REC-RT-5970' || route.id.includes('5970')) assignedVehicle = 'OD-14-M-3349 (Eicher Pro Reefer)';
     else if (route.vehicleId && route.vehicleId.startsWith('OD-')) assignedVehicle = route.vehicleId;
 
-    // Find shipments specifically dispatched / assigned to this vehicle
-    const explicitlyAssignedToVehicle = allShipments.filter(s => 
-      s.assignedVehicle && (s.assignedVehicle === assignedVehicle || assignedVehicle.includes(s.assignedVehicle.split(' ')[0]))
-    ).map(s => s.id);
-
-    // Find cluster for these shipments from clusterShipments mapping
-    const clusterFromShipments = allClusterShipments.find(cs => explicitlyAssignedToVehicle.includes(cs.shipmentId))?.clusterId;
-
-    const matchingCluster = allClusters.find(c => 
-      (route.clusterId && c.id === route.clusterId) || 
-      route.id.includes(c.id.replace('REC-CLST-', '').replace('CLST-', ''))
-    );
-
-    const targetClusterId = clusterFromShipments || route.clusterId || matchingCluster?.id;
+    // SHIPMENT MATCHING — same priority logic as getRoutes:
+    // 1. route.clusterId first (prevents old deliveries on same truck from bleeding in)
+    // 2. Vehicle plate matching as fallback (for legacy routes with no cluster link)
 
     let matchingShipments: string[] = [];
-    if (explicitlyAssignedToVehicle.length > 0) {
-      matchingShipments = explicitlyAssignedToVehicle;
-    } else if (route.id.includes('7415') && targetClusterId) {
+
+    if (route.clusterId) {
+      // Priority 1: only shipments from the cluster currently linked to this route
       matchingShipments = allClusterShipments
-        .filter((cs: any) => cs.clusterId === targetClusterId)
+        .filter((cs: any) => cs.clusterId === route.clusterId)
         .map((cs: any) => cs.shipmentId);
+    }
+
+    if (matchingShipments.length === 0) {
+      // Priority 2: vehicle plate fallback
+      const platePrefix = assignedVehicle.split(' ')[0];
+      matchingShipments = allShipments.filter(s =>
+        s.assignedVehicle && (
+          s.assignedVehicle === assignedVehicle ||
+          s.assignedVehicle.startsWith(platePrefix) ||
+          assignedVehicle.startsWith(s.assignedVehicle.split(' ')[0])
+        )
+      ).map(s => s.id);
+
+      // Narrow to most-recent cluster to avoid stale deliveries
+      if (matchingShipments.length > 0) {
+        const clusterIds = [...new Set(
+          allClusterShipments.filter(cs => matchingShipments.includes(cs.shipmentId)).map(cs => cs.clusterId)
+        )];
+        const latestClusterId = allClusters
+          .filter(c => clusterIds.includes(c.id))
+          .sort((a, b) => new Date((b as any).createdAt || 0).getTime() - new Date((a as any).createdAt || 0).getTime())[0]?.id;
+        if (latestClusterId) {
+          matchingShipments = allClusterShipments
+            .filter(cs => cs.clusterId === latestClusterId)
+            .map(cs => cs.shipmentId);
+        }
+      }
     }
 
     const matchingShipmentDetails = allShipments.filter(s => matchingShipments.includes(s.id));
 
-    // Derive accurate route status from assigned shipments
+    // Derive accurate route status — same guarded logic as getRoutes.
+    // Only flip to 'completed' when the driver has already done so explicitly.
     let routeStatus = route.status;
+    const hasDriverCompletedStops = !!((route as any).completedStops);
     if (matchingShipmentDetails.length > 0) {
       const allDelivered = matchingShipmentDetails.every(s => s.status === 'delivered');
       const anyInTransit = matchingShipmentDetails.some(s => s.status === 'in_transit' || s.status === 'dispatched' || s.status === 'pending_consolidation' || s.status === 'approved');
-      if (allDelivered) {
+      if (allDelivered && (route.status === 'completed' || hasDriverCompletedStops)) {
         routeStatus = 'completed';
-      } else if (anyInTransit) {
+      } else if (anyInTransit && route.status !== 'completed') {
         routeStatus = 'in_transit';
       }
     }
@@ -417,7 +458,7 @@ export const getRouteById = async (req: Request, res: Response, next: NextFuncti
 
     const computedStops = matchingShipments.length > 0 ? buildDynamicStops(route.id, legs, matchingShipments, dbCompletedStops) : [];
 
-    const clusterCode = matchingShipments.length > 0 ? (targetClusterId || route.clusterId || 'Consolidated') : 'Standby';
+    const clusterCode = matchingShipments.length > 0 ? (route.clusterId || 'Consolidated') : 'Standby';
 
     const formatted = {
       ...route,
@@ -616,7 +657,10 @@ export const updateRoute = async (req: Request, res: Response, next: NextFunctio
     if (req.body.completedStops !== undefined) {
       updateFields.completedStops = req.body.completedStops;
       if (req.body.completedStops === null) {
+        // Explicitly clear both in-memory and DB — this fires when admin dispatches a
+        // new cluster to the route, ensuring the fresh manifest starts with no completed stops.
         completedRouteStops.delete(id);
+        await db.update(deliveryRoutes).set({ completedStops: null }).where(eq(deliveryRoutes.id, id));
       }
     }
 
